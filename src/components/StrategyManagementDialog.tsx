@@ -210,21 +210,44 @@ export function StrategyManagementDialog({
                             </Badge>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-muted/20 p-2 rounded">
-                            <div>
-                              <span className="font-medium">阶段列表:</span>
-                              <div className="mt-1 space-y-1">
-                                {strategy.stages.slice(0, 3).map((stage, idx) => (
-                                  <div key={idx} className="text-muted-foreground">
-                                    {idx + 1}. {stage.name} ({stage.duration}{stage.unit === 'minutes' ? '分' : stage.unit === 'seconds' ? '秒' : stage.unit === 'hours' ? '时' : ''})
+                          <div className="space-y-2">
+                            <div className="text-xs font-medium text-muted-foreground">加载后预览：</div>
+                            <div className="bg-muted/20 p-3 rounded border-2 border-dashed border-border space-y-2">
+                              {strategy.loadMode === 'expand' ? (
+                                <div className="space-y-1">
+                                  <div className="text-xs text-accent font-medium mb-2">展开模式 - 将显示所有子阶段</div>
+                                  {strategy.stages.map((stage, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 bg-background/50 p-2 rounded text-xs">
+                                      <span className="font-medium text-muted-foreground w-6">{idx + 1}</span>
+                                      <span className="flex-1 truncate">{stage.name}</span>
+                                      <span className="text-muted-foreground shrink-0">
+                                        {stage.duration}{stage.unit === 'minutes' ? '分' : stage.unit === 'seconds' ? '秒' : stage.unit === 'hours' ? '时' : stage.unit === 'days' ? '天' : ''}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="text-xs text-primary font-medium mb-2">嵌入模式 - 将显示为单个合并阶段</div>
+                                  <div className="flex items-center gap-2 bg-accent/10 border-2 border-accent p-3 rounded">
+                                    <span className="font-medium text-muted-foreground w-6">1</span>
+                                    <span className="flex-1 font-medium">{strategy.name}</span>
+                                    <Badge variant="secondary" className="shrink-0 text-xs">
+                                      {getTotalDuration(strategy.stages)}
+                                    </Badge>
                                   </div>
-                                ))}
-                                {strategy.stages.length > 3 && (
-                                  <div className="text-muted-foreground">
-                                    ...还有 {strategy.stages.length - 3} 个阶段
-                                  </div>
-                                )}
-                              </div>
+                                  <details className="text-xs mt-2">
+                                    <summary className="cursor-pointer text-accent hover:text-accent/80 pl-2">包含 {strategy.stages.length} 个子阶段</summary>
+                                    <div className="mt-2 space-y-1 pl-4 border-l-2 border-accent/30">
+                                      {strategy.stages.map((stage, idx) => (
+                                        <div key={idx} className="text-muted-foreground">
+                                          {idx + 1}. {stage.name} ({stage.duration}{stage.unit === 'minutes' ? '分' : stage.unit === 'seconds' ? '秒' : stage.unit === 'hours' ? '时' : ''})
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </details>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </>
