@@ -9,10 +9,11 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
+import { StrategyManagementDialog } from '@/components/StrategyManagementDialog'
 
 function App() {
   const [stages, setStages] = useKV<Stage[]>('timer-stages', [])
@@ -481,6 +482,32 @@ function App() {
     setSelectedStageIds(new Set())
   }
 
+  const handleLoadStrategy = (strategyStages: Stage[], mode: 'expand' | 'embed') => {
+    if (mode === 'expand') {
+      setStages((current) => [...(current || []), ...strategyStages])
+    } else {
+      let totalDurationMs = 0
+      strategyStages.forEach((stage) => {
+        totalDurationMs += convertToMilliseconds(stage.duration, stage.unit)
+      })
+
+      const embeddedStage: Stage = {
+        id: generateId(),
+        name: `策略组: ${strategyStages.map(s => s.name).slice(0, 3).join(' + ')}${strategyStages.length > 3 ? '...' : ''}`,
+        duration: totalDurationMs / TIME_UNITS.minutes,
+        unit: 'minutes',
+        runningSettings: {
+          ...strategyStages[0].runningSettings,
+        },
+        endSettings: {
+          ...strategyStages[strategyStages.length - 1].endSettings,
+        },
+      }
+
+      setStages((current) => [...(current || []), embeddedStage])
+    }
+  }
+
   const currentStage = stages ? stages[timerState.currentStageIndex[0]] : undefined
   const remainingTime = currentStage
     ? convertToMilliseconds(currentStage.duration, currentStage.unit) - timerState.currentStageElapsed
@@ -491,7 +518,6 @@ function App() {
       case 'infinite': return '无限循环'
       case 'fixed-count': return '固定次数循环'
       case 'time-limited': return '限定时长循环'
-      case 'nested': return '嵌套循环'
       default: return '无限循环'
     }
   }
@@ -576,6 +602,18 @@ function App() {
                   </Button>
                 </>
               )}
+              <StrategyManagementDialog
+                currentStages={stages}
+                currentLoop={loop}
+                currentSettings={settings}
+                onLoadStrategy={handleLoadStrategy}
+              >
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
+                  <StackSimple className="mr-2" />
+                  <span className="hidden sm:inline">策略管理</span>
+                  <span className="sm:hidden">策略</span>
+                </Button>
+              </StrategyManagementDialog>
               <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat className="mr-2" />

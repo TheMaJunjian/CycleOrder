@@ -1,6 +1,6 @@
 export type TimeUnit = 'nanoseconds' | 'microseconds' | 'milliseconds' | 'seconds' | 'minutes' | 'hours' | 'days' | 'months' | 'years'
 
-export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited' | 'nested'
+export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited'
 
 export interface StageSettings {
   soundFile?: string
@@ -56,4 +56,15 @@ export interface TimerState {
   currentStageElapsed: number
   totalElapsed: number
   currentLoopIteration: number[]
+}
+
+export interface Strategy {
+  id: string
+  name: string
+  description?: string
+  stages: Stage[]
+  loop: Loop
+  settings: Settings
+  createdAt: number
+  updatedAt: number
 }

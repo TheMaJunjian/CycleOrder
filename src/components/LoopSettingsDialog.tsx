@@ -41,7 +41,6 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
                 <SelectItem value="infinite">无限循环</SelectItem>
                 <SelectItem value="fixed-count">固定次数循环</SelectItem>
                 <SelectItem value="time-limited">限定总时长循环</SelectItem>
-                <SelectItem value="nested">嵌套循环</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -89,14 +88,6 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )}
-
-          {loop.loopMode === 'nested' && (
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                嵌套循环模式下，当前组将作为一个整体在更大的循环中重复执行
-              </p>
             </div>
           )}
         </div>
