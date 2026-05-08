@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode } from '@/types'
-import { convertToMilliseconds, formatTime, generateId, vibrateDevice } from '@/lib/timer-utils'
+import { convertToMilliseconds, formatTime, generateId, vibrateDevice, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
@@ -43,6 +43,7 @@ function App() {
 
   const [showAlert, setShowAlert] = useState(false)
   const [completedStage, setCompletedStage] = useState<Stage | null>(null)
+  const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -403,6 +404,83 @@ function App() {
     setStages((current) => (current || []).map((s) => (s.id === id ? { ...s, ...updates } : s)))
   }
 
+  const duplicateStage = (id: string) => {
+    if (!stages) return
+    const stageToDuplicate = stages.find((s) => s.id === id)
+    if (!stageToDuplicate) return
+    
+    const newStage: Stage = {
+      ...stageToDuplicate,
+      id: generateId(),
+      name: `${stageToDuplicate.name} (副本)`,
+    }
+    
+    const stageIndex = stages.findIndex((s) => s.id === id)
+    setStages((current) => {
+      const updated = [...(current || [])]
+      updated.splice(stageIndex + 1, 0, newStage)
+      return updated
+    })
+    toast.success('阶段已复制')
+  }
+
+  const toggleStageSelection = (id: string) => {
+    setSelectedStageIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const mergeSelectedStages = () => {
+    if (!stages || selectedStageIds.size < 2) {
+      toast.error('请至少选择两个阶段进行合并')
+      return
+    }
+
+    const selectedStages = stages.filter((s) => selectedStageIds.has(s.id))
+    const sortedSelectedStages = selectedStages.sort((a, b) => {
+      return stages.indexOf(a) - stages.indexOf(b)
+    })
+
+    let totalDurationMs = 0
+    sortedSelectedStages.forEach((stage) => {
+      totalDurationMs += convertToMilliseconds(stage.duration, stage.unit)
+    })
+
+    const mergedStage: Stage = {
+      id: generateId(),
+      name: sortedSelectedStages.map((s) => s.name).join(' + '),
+      duration: totalDurationMs / TIME_UNITS.minutes,
+      unit: 'minutes',
+      runningSettings: {
+        ...sortedSelectedStages[0].runningSettings,
+      },
+      endSettings: {
+        ...sortedSelectedStages[sortedSelectedStages.length - 1].endSettings,
+      },
+    }
+
+    const firstSelectedIndex = stages.indexOf(sortedSelectedStages[0])
+    
+    setStages((current) => {
+      const filtered = (current || []).filter((s) => !selectedStageIds.has(s.id))
+      filtered.splice(firstSelectedIndex, 0, mergedStage)
+      return filtered
+    })
+
+    setSelectedStageIds(new Set())
+    toast.success(`已合并 ${selectedStageIds.size} 个阶段`)
+  }
+
+  const clearSelection = () => {
+    setSelectedStageIds(new Set())
+  }
+
   const currentStage = stages ? stages[timerState.currentStageIndex[0]] : undefined
   const remainingTime = currentStage
     ? convertToMilliseconds(currentStage.duration, currentStage.unit) - timerState.currentStageElapsed
@@ -475,7 +553,29 @@ function App() {
         <Card className="p-4 sm:p-6 space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h3 className="text-xl font-semibold">阶段设置</h3>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              {selectedStageIds.size > 0 && (
+                <>
+                  <Button 
+                    onClick={mergeSelectedStages} 
+                    size="sm" 
+                    variant="secondary"
+                    className="flex-1 sm:flex-initial"
+                  >
+                    <Unite className="mr-2" />
+                    <span className="hidden sm:inline">合并选中 ({selectedStageIds.size})</span>
+                    <span className="sm:hidden">合并 ({selectedStageIds.size})</span>
+                  </Button>
+                  <Button 
+                    onClick={clearSelection} 
+                    size="sm" 
+                    variant="outline"
+                    className="flex-1 sm:flex-initial"
+                  >
+                    取消选择
+                  </Button>
+                </>
+              )}
               <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat className="mr-2" />
@@ -493,25 +593,54 @@ function App() {
 
           <div className="space-y-3">
             {stages.map((stage, index) => (
-              <div key={stage.id} className="p-3 bg-muted/50 rounded-lg space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground w-8">{index + 1}</span>
+              <div 
+                key={stage.id} 
+                className={`p-3 rounded-lg space-y-3 transition-colors ${
+                  selectedStageIds.has(stage.id) 
+                    ? 'bg-primary/10 border-2 border-primary' 
+                    : 'bg-muted/50 border-2 border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedStageIds.has(stage.id)}
+                    onChange={() => toggleStageSelection(stage.id)}
+                    className="w-4 h-4 shrink-0 cursor-pointer"
+                    aria-label="选择阶段"
+                  />
+                  <span className="text-sm font-medium text-muted-foreground w-6 sm:w-8 text-center shrink-0">{index + 1}</span>
                   <Input
                     value={stage.name}
                     onChange={(e) => updateStage(stage.id, { name: e.target.value })}
-                    className="flex-1"
+                    className="flex-1 min-w-0"
                     placeholder="阶段名称"
                   />
-                  <Button onClick={() => deleteStage(stage.id)} variant="destructive" size="icon" className="shrink-0">
+                  <Button 
+                    onClick={() => duplicateStage(stage.id)} 
+                    variant="outline" 
+                    size="icon" 
+                    className="shrink-0"
+                    title="复制阶段"
+                  >
+                    <Copy />
+                  </Button>
+                  <Button 
+                    onClick={() => deleteStage(stage.id)} 
+                    variant="destructive" 
+                    size="icon" 
+                    className="shrink-0"
+                    title="删除阶段"
+                  >
                     <Trash />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 pl-11">
+                <div className="flex items-center gap-2 pl-6 sm:pl-11">
                   <Input
                     type="number"
                     value={stage.duration}
                     onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
-                    className="w-20 sm:w-24"
+                    className="w-16 sm:w-24"
                     step="0.1"
                   />
                   <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
