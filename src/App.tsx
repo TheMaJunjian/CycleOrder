@@ -8,12 +8,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix } from '@phosphor-icons/react'
+import { Badge } from '@/components/ui/badge'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
+import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
 
 function App() {
   const [stages, setStages] = useKV<Stage[]>('timer-stages', [])
+  const [loop, setLoop] = useKV<Loop>('timer-loop', {
+    id: generateId(),
+    name: '主循环',
+    stages: [],
+    loopMode: 'infinite',
+    currentIteration: 0,
+    totalElapsed: 0,
+  })
   const [settings, setSettings] = useKV<Settings>('timer-settings', {
     showFullscreenAlert: true,
     forceAcknowledge: false,
@@ -39,7 +49,44 @@ function App() {
   const customSoundRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    if (timerState.isRunning && !timerState.isPaused && stages && settings) {
+    if (!stages || !loop) return
+    setLoop((currentLoop) => {
+      if (!currentLoop) {
+        return {
+          id: generateId(),
+          name: '主循环',
+          stages,
+          loopMode: 'infinite' as LoopMode,
+          currentIteration: 0,
+          totalElapsed: 0,
+        }
+      }
+      return { ...currentLoop, stages }
+    })
+  }, [stages])
+
+  const shouldContinueLoop = (): boolean => {
+    if (!loop) return false
+    
+    if (loop.loopMode === 'infinite') return true
+    
+    if (loop.loopMode === 'fixed-count') {
+      return (loop.currentIteration || 0) < (loop.loopCount || 1)
+    }
+    
+    if (loop.loopMode === 'time-limited') {
+      const maxDuration = convertToMilliseconds(
+        loop.loopDuration || 60, 
+        loop.loopDurationUnit || 'minutes'
+      )
+      return (loop.totalElapsed || 0) < maxDuration
+    }
+    
+    return true
+  }
+
+  useEffect(() => {
+    if (timerState.isRunning && !timerState.isPaused && stages && settings && loop) {
       const currentStage = stages[timerState.currentStageIndex[0]]
       
       if (currentStage) {
@@ -57,9 +104,50 @@ function App() {
 
           if (newElapsed >= stageDuration) {
             handleStageComplete(currentStage)
+            
+            const nextStageIndex = prev.currentStageIndex[0] + 1
+            
+            if (nextStageIndex >= stages.length) {
+              setLoop((currentLoop) => {
+                if (!currentLoop) {
+                  return {
+                    id: generateId(),
+                    name: '主循环',
+                    stages,
+                    loopMode: 'infinite' as LoopMode,
+                    currentIteration: 0,
+                    totalElapsed: 0,
+                  }
+                }
+                return {
+                  ...currentLoop,
+                  currentIteration: (currentLoop.currentIteration || 0) + 1,
+                  totalElapsed: (currentLoop.totalElapsed || 0) + prev.totalElapsed + newElapsed,
+                }
+              })
+              
+              if (!shouldContinueLoop()) {
+                toast.success('循环已完成')
+                return {
+                  ...prev,
+                  isRunning: false,
+                  currentStageIndex: [0],
+                  currentStageElapsed: 0,
+                  totalElapsed: 0,
+                }
+              }
+              
+              return {
+                ...prev,
+                currentStageIndex: [0],
+                currentStageElapsed: 0,
+                totalElapsed: 0,
+              }
+            }
+            
             return {
               ...prev,
-              currentStageIndex: [(prev.currentStageIndex[0] + 1) % stages.length],
+              currentStageIndex: [nextStageIndex],
               currentStageElapsed: 0,
               totalElapsed: prev.totalElapsed + newElapsed,
             }
@@ -86,7 +174,7 @@ function App() {
       }
       stopAllEffects()
     }
-  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings])
+  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings, loop])
 
   const playStageRunningEffects = (stage: Stage) => {
     if (!stage.runningSettings) return
@@ -250,6 +338,40 @@ function App() {
       totalElapsed: 0,
       currentLoopIteration: [0],
     })
+    setLoop((currentLoop) => {
+      if (!currentLoop) {
+        return {
+          id: generateId(),
+          name: '主循环',
+          stages: stages || [],
+          loopMode: 'infinite' as LoopMode,
+          currentIteration: 0,
+          totalElapsed: 0,
+        }
+      }
+      return {
+        ...currentLoop,
+        currentIteration: 0,
+        totalElapsed: 0,
+      }
+    })
+  }
+
+  const updateLoop = (updates: Partial<Loop>) => {
+    setLoop((currentLoop) => {
+      if (!currentLoop) {
+        return {
+          id: generateId(),
+          name: '主循环',
+          stages: stages || [],
+          loopMode: 'infinite' as LoopMode,
+          currentIteration: 0,
+          totalElapsed: 0,
+          ...updates,
+        }
+      }
+      return { ...currentLoop, ...updates }
+    })
   }
 
   const addStage = () => {
@@ -286,7 +408,17 @@ function App() {
     ? convertToMilliseconds(currentStage.duration, currentStage.unit) - timerState.currentStageElapsed
     : 0
 
-  if (!stages || !settings) {
+  const getLoopModeLabel = (mode: LoopMode): string => {
+    switch (mode) {
+      case 'infinite': return '无限循环'
+      case 'fixed-count': return '固定次数循环'
+      case 'time-limited': return '限定时长循环'
+      case 'nested': return '嵌套循环'
+      default: return '无限循环'
+    }
+  }
+
+  if (!stages || !settings || !loop) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
       <p className="text-muted-foreground">加载中...</p>
     </div>
@@ -296,8 +428,8 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background p-4 md:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">循环提醒工具</h1>
-          <p className="text-muted-foreground">多阶段循环计时器</p>
+          <h1 className="text-4xl font-bold text-foreground">环序</h1>
+          <p className="text-muted-foreground">CycleOrder - 多阶段循环计时器</p>
         </div>
 
         {timerState.isRunning && currentStage && (
@@ -309,6 +441,25 @@ function App() {
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">剩余时间</p>
               <div className="text-5xl font-bold text-accent">{formatTime(remainingTime)}</div>
+            </div>
+            <div className="flex gap-4 justify-center items-center text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Repeat size={16} />
+                <span>{getLoopModeLabel(loop.loopMode)}</span>
+              </div>
+              {loop.loopMode === 'fixed-count' && loop.loopCount && (
+                <Badge variant="secondary">
+                  第 {(loop.currentIteration || 0) + 1} / {loop.loopCount} 次
+                </Badge>
+              )}
+              {loop.loopMode === 'time-limited' && loop.loopDuration && loop.loopDurationUnit && (
+                <Badge variant="secondary">
+                  已用 {formatTime(loop.totalElapsed || 0)} / {loop.loopDuration} {loop.loopDurationUnit}
+                </Badge>
+              )}
+              {loop.loopMode === 'infinite' && (
+                <Badge variant="secondary">第 {(loop.currentIteration || 0) + 1} 次循环</Badge>
+              )}
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
@@ -324,10 +475,18 @@ function App() {
         <Card className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold">阶段设置</h3>
-            <Button onClick={addStage} size="sm">
-              <Plus className="mr-2" />
-              添加阶段
-            </Button>
+            <div className="flex gap-2">
+              <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
+                <Button variant="outline" size="sm">
+                  <Repeat className="mr-2" />
+                  循环设置
+                </Button>
+              </LoopSettingsDialog>
+              <Button onClick={addStage} size="sm">
+                <Plus className="mr-2" />
+                添加阶段
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -352,10 +511,15 @@ function App() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="nanoseconds">纳秒</SelectItem>
+                    <SelectItem value="microseconds">微秒</SelectItem>
+                    <SelectItem value="milliseconds">毫秒</SelectItem>
                     <SelectItem value="seconds">秒</SelectItem>
                     <SelectItem value="minutes">分钟</SelectItem>
                     <SelectItem value="hours">小时</SelectItem>
                     <SelectItem value="days">天</SelectItem>
+                    <SelectItem value="months">月</SelectItem>
+                    <SelectItem value="years">年</SelectItem>
                   </SelectContent>
                 </Select>
                 <StageSettingsDialog

@@ -1,40 +1,36 @@
 export type TimeUnit = 'nanoseconds' | 'microseconds' | 'milliseconds' | 'seconds' | 'minutes' | 'hours' | 'days' | 'months' | 'years'
 
-export type LoopMode = 'infinite' | 'count' | 'duration'
+export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited' | 'nested'
+
+export interface StageSettings {
+  soundFile?: string
+  randomSound: boolean
+  soundCategory?: string
+  wallpaper?: string
+  wallpaperMode: 'fixed' | 'random'
+  vibrationPattern?: number[]
+  enableVibration: boolean
+}
 
 export interface Stage {
   id: string
   name: string
   duration: number
   unit: TimeUnit
-  runningSettings: {
-    soundFile?: string
-    randomSound: boolean
-    soundCategory?: string
-    wallpaper?: string
-    wallpaperMode: 'fixed' | 'random'
-    vibrationPattern?: number[]
-    enableVibration: boolean
-  }
-  endSettings: {
-    soundFile?: string
-    randomSound: boolean
-    soundCategory?: string
-    wallpaper?: string
-    wallpaperMode: 'fixed' | 'random'
-    vibrationPattern?: number[]
-    enableVibration: boolean
-  }
+  runningSettings: StageSettings
+  endSettings: StageSettings
 }
 
 export interface Loop {
   id: string
   name: string
-  stages: (Stage | Loop)[]
+  stages: Stage[]
   loopMode: LoopMode
   loopCount?: number
   loopDuration?: number
   loopDurationUnit?: TimeUnit
+  currentIteration?: number
+  totalElapsed?: number
 }
 
 export interface Wallpaper {
