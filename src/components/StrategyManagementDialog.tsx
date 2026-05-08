@@ -13,15 +13,14 @@ import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils
 import { Badge } from '@/components/ui/badge'
 
 interface StrategyManagementDialogProps {
-  children: React.ReactNode
+interface StrategyManagementDialogProps {
   currentStages: Stage[]
   currentLoop: Loop
   currentSettings: Settings
   onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
-}
 
-export function StrategyManagementDialog({
-  children,
+}xport function StrategyManagementDialog({
+
   currentStages,
   currentLoop,
   currentSettings,
@@ -33,59 +32,49 @@ export function StrategyManagementDialog({
   const [newStrategyDescription, setNewStrategyDescription] = useState('')
 
   const handleSaveCurrentStrategy = () => {
-    if (!newStrategyName.trim()) {
-      toast.error('请输入策略名称')
+
+  const handleSaveCurrentStrategy = () => {
       return
     }
 
     if (!currentStages || currentStages.length === 0) {
       toast.error('当前没有阶段，无法保存策略')
-      return
     }
 
+    const newStrategy: Strategy = {
+      id: generateId(),
+      name: newStrategyName.trim(),
     const newStrategy: Strategy = {
       id: generateId(),
       name: newStrategyName.trim(),
       description: newStrategyDescription.trim(),
       stages: currentStages,
       loop: currentLoop,
-      settings: currentSettings,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
       loadMode: 'expand',
       isCollapsed: false,
     }
-
-    setStrategies((current) => [...(current || []), newStrategy])
+      loadMode: 'expand',
+      isCollapsed: false,
     setNewStrategyName('')
     setNewStrategyDescription('')
     toast.success(`策略"${newStrategy.name}"已保存`)
   }
 
   const handleLoadStrategy = (strategy: Strategy) => {
+  }adMode || 'expand'
+gy.stages, mode, strategy.id, strategy.name)
+    toast.success(`策略"${strategy.name}"已${mode === 'expand' ? '展开' : '嵌入'}加载`)
     const mode = strategy.loadMode || 'expand'
     onLoadStrategy(strategy.stages, mode, strategy.id, strategy.name)
     toast.success(`策略"${strategy.name}"已${mode === 'expand' ? '展开' : '嵌入'}加载`)
-    setOpen(false)
-  }
-
   const handleDeleteStrategy = (id: string) => {
     setStrategies((current) => (current || []).filter((s) => s.id !== id))
     toast.success('策略已删除')
   }
 
   const toggleStrategyLoadMode = (id: string) => {
-    setStrategies((current) => 
-      (current || []).map((s) => 
-        s.id === id 
-          ? { ...s, loadMode: (s.loadMode === 'expand' ? 'embed' : 'expand') as StrategyLoadMode }
-          : s
-      )
-    )
   }
 
-  const toggleStrategyCollapsed = (id: string) => {
-    setStrategies((current) => 
       (current || []).map((s) => 
         s.id === id 
           ? { ...s, isCollapsed: !s.isCollapsed }
@@ -102,6 +91,10 @@ export function StrategyManagementDialog({
     return formatTime(totalMs)
   }
 
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -131,10 +124,6 @@ export function StrategyManagementDialog({
               <div className="space-y-2">
                 <Label>策略描述（可选）</Label>
                 <Textarea
-                  value={newStrategyDescription}
-                  onChange={(e) => setNewStrategyDescription(e.target.value)}
-                  placeholder="简要描述此策略的用途"
-                  rows={2}
                 />
               </div>
               <Button 
