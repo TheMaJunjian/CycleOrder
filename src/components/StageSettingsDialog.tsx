@@ -1,0 +1,401 @@
+import { useState, useRef } from 'react'
+import { Stage } from '@/types'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
+import { SpeakerHigh, Image, Vibrate, Upload } from '@phosphor-icons/react'
+import { toast } from 'sonner'
+
+interface StageSettingsDialogProps {
+  stage: Stage
+  onUpdate: (updates: Partial<Stage>) => void
+  children: React.ReactNode
+}
+
+export function StageSettingsDialog({ stage, onUpdate, children }: StageSettingsDialogProps) {
+  const [open, setOpen] = useState(false)
+  const soundRunningRef = useRef<HTMLInputElement>(null)
+  const soundEndRef = useRef<HTMLInputElement>(null)
+  const wallpaperRunningRef = useRef<HTMLInputElement>(null)
+  const wallpaperEndRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = (
+    file: File | undefined,
+    type: 'sound-running' | 'sound-end' | 'wallpaper-running' | 'wallpaper-end'
+  ) => {
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      
+      if (type === 'sound-running') {
+        onUpdate({
+          runningSettings: {
+            ...stage.runningSettings,
+            soundFile: dataUrl,
+          },
+        })
+        toast.success('运行音效已上传')
+      } else if (type === 'sound-end') {
+        onUpdate({
+          endSettings: {
+            ...stage.endSettings,
+            soundFile: dataUrl,
+          },
+        })
+        toast.success('结束音效已上传')
+      } else if (type === 'wallpaper-running') {
+        onUpdate({
+          runningSettings: {
+            ...stage.runningSettings,
+            wallpaper: dataUrl,
+          },
+        })
+        toast.success('运行壁纸已上传')
+      } else if (type === 'wallpaper-end') {
+        onUpdate({
+          endSettings: {
+            ...stage.endSettings,
+            wallpaper: dataUrl,
+          },
+        })
+        toast.success('结束壁纸已上传')
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">阶段设置 - {stage.name}</DialogTitle>
+        </DialogHeader>
+        
+        <Tabs defaultValue="running" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="running">运行时提示</TabsTrigger>
+            <TabsTrigger value="end">结束时提示</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="running" className="space-y-6 mt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <SpeakerHigh className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">音效设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>随机音效</Label>
+                  <Switch
+                    checked={stage.runningSettings.randomSound}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        runningSettings: {
+                          ...stage.runningSettings,
+                          randomSound: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {!stage.runningSettings.randomSound && (
+                  <div className="space-y-2">
+                    <Label>上传音效文件</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="audio/*"
+                        ref={soundRunningRef}
+                        onChange={(e) => handleFileUpload(e.target.files?.[0], 'sound-running')}
+                        className="hidden"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => soundRunningRef.current?.click()}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2" />
+                        选择音效
+                      </Button>
+                      {stage.runningSettings.soundFile && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            onUpdate({
+                              runningSettings: {
+                                ...stage.runningSettings,
+                                soundFile: undefined,
+                              },
+                            })
+                          }
+                        >
+                          清除
+                        </Button>
+                      )}
+                    </div>
+                    {stage.runningSettings.soundFile && (
+                      <p className="text-sm text-muted-foreground">已上传音效文件</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">壁纸设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>随机壁纸</Label>
+                  <Switch
+                    checked={stage.runningSettings.wallpaperMode === 'random'}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        runningSettings: {
+                          ...stage.runningSettings,
+                          wallpaperMode: checked ? 'random' : 'fixed',
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {stage.runningSettings.wallpaperMode === 'fixed' && (
+                  <div className="space-y-2">
+                    <Label>上传壁纸文件</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*,video/*"
+                        ref={wallpaperRunningRef}
+                        onChange={(e) => handleFileUpload(e.target.files?.[0], 'wallpaper-running')}
+                        className="hidden"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => wallpaperRunningRef.current?.click()}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2" />
+                        选择壁纸
+                      </Button>
+                      {stage.runningSettings.wallpaper && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            onUpdate({
+                              runningSettings: {
+                                ...stage.runningSettings,
+                                wallpaper: undefined,
+                              },
+                            })
+                          }
+                        >
+                          清除
+                        </Button>
+                      )}
+                    </div>
+                    {stage.runningSettings.wallpaper && (
+                      <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Vibrate className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">震动设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>启用震动</Label>
+                  <Switch
+                    checked={stage.runningSettings.enableVibration}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        runningSettings: {
+                          ...stage.runningSettings,
+                          enableVibration: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="end" className="space-y-6 mt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <SpeakerHigh className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">音效设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>随机音效</Label>
+                  <Switch
+                    checked={stage.endSettings.randomSound}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        endSettings: {
+                          ...stage.endSettings,
+                          randomSound: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {!stage.endSettings.randomSound && (
+                  <div className="space-y-2">
+                    <Label>上传音效文件</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="audio/*"
+                        ref={soundEndRef}
+                        onChange={(e) => handleFileUpload(e.target.files?.[0], 'sound-end')}
+                        className="hidden"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => soundEndRef.current?.click()}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2" />
+                        选择音效
+                      </Button>
+                      {stage.endSettings.soundFile && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            onUpdate({
+                              endSettings: {
+                                ...stage.endSettings,
+                                soundFile: undefined,
+                              },
+                            })
+                          }
+                        >
+                          清除
+                        </Button>
+                      )}
+                    </div>
+                    {stage.endSettings.soundFile && (
+                      <p className="text-sm text-muted-foreground">已上传音效文件</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">壁纸设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>随机壁纸</Label>
+                  <Switch
+                    checked={stage.endSettings.wallpaperMode === 'random'}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        endSettings: {
+                          ...stage.endSettings,
+                          wallpaperMode: checked ? 'random' : 'fixed',
+                        },
+                      })
+                    }
+                  />
+                </div>
+
+                {stage.endSettings.wallpaperMode === 'fixed' && (
+                  <div className="space-y-2">
+                    <Label>上传壁纸文件</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*,video/*"
+                        ref={wallpaperEndRef}
+                        onChange={(e) => handleFileUpload(e.target.files?.[0], 'wallpaper-end')}
+                        className="hidden"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => wallpaperEndRef.current?.click()}
+                        className="flex-1"
+                      >
+                        <Upload className="mr-2" />
+                        选择壁纸
+                      </Button>
+                      {stage.endSettings.wallpaper && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            onUpdate({
+                              endSettings: {
+                                ...stage.endSettings,
+                                wallpaper: undefined,
+                              },
+                            })
+                          }
+                        >
+                          清除
+                        </Button>
+                      )}
+                    </div>
+                    {stage.endSettings.wallpaper && (
+                      <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Vibrate className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">震动设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between">
+                  <Label>启用震动</Label>
+                  <Switch
+                    checked={stage.endSettings.enableVibration}
+                    onCheckedChange={(checked) =>
+                      onUpdate({
+                        endSettings: {
+                          ...stage.endSettings,
+                          enableVibration: checked,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  )
+}

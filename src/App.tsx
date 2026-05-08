@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, Upload } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 
 function App() {
   const [stages, setStages] = useKV<Stage[]>('timer-stages', [])
@@ -34,9 +35,16 @@ function App() {
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const customSoundRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (timerState.isRunning && !timerState.isPaused && stages && settings) {
+      const currentStage = stages[timerState.currentStageIndex[0]]
+      
+      if (currentStage) {
+        playStageRunningEffects(currentStage)
+      }
+
       intervalRef.current = window.setInterval(() => {
         setTimerState((prev) => {
           const newElapsed = prev.currentStageElapsed + 100
@@ -47,7 +55,7 @@ function App() {
           const stageDuration = convertToMilliseconds(currentStage.duration, currentStage.unit)
 
           if (newElapsed >= stageDuration) {
-            handleStageComplete()
+            handleStageComplete(currentStage)
             return {
               ...prev,
               currentStageIndex: [(prev.currentStageIndex[0] + 1) % stages.length],
@@ -63,25 +71,54 @@ function App() {
           }
         })
       }, 100)
-
-      playBackgroundNoise()
-      if (settings.enableVibration) {
-        vibrateDevice([50, 2000])
-      }
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
-      stopBackgroundNoise()
+      stopAllEffects()
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
+      stopAllEffects()
     }
-  }, [timerState.isRunning, timerState.isPaused, stages, settings])
+  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings])
+
+  const playStageRunningEffects = (stage: Stage) => {
+    if (!settings?.muteAudio && stage.runningSettings.soundFile && !stage.runningSettings.randomSound) {
+      playCustomSound(stage.runningSettings.soundFile)
+    } else if (!settings?.muteAudio) {
+      playBackgroundNoise()
+    }
+
+    if (stage.runningSettings.enableVibration) {
+      if (stage.runningSettings.vibrationPattern) {
+        vibrateDevice(stage.runningSettings.vibrationPattern)
+      } else {
+        vibrateDevice([50, 2000])
+      }
+    }
+  }
+
+  const playCustomSound = (soundDataUrl: string) => {
+    try {
+      if (customSoundRef.current) {
+        customSoundRef.current.pause()
+        customSoundRef.current = null
+      }
+
+      const audio = new Audio(soundDataUrl)
+      audio.loop = true
+      audio.volume = 0.3
+      audio.play().catch((e) => console.error('Failed to play custom sound', e))
+      customSoundRef.current = audio
+    } catch (e) {
+      console.error('Failed to load custom sound', e)
+    }
+  }
 
   const playBackgroundNoise = () => {
     if (!settings || settings.muteAudio) return
@@ -111,24 +148,48 @@ function App() {
     }
   }
 
-  const stopBackgroundNoise = () => {
+  const stopAllEffects = () => {
     if (noiseSourceRef.current) {
       noiseSourceRef.current.stop()
       noiseSourceRef.current = null
     }
+    if (customSoundRef.current) {
+      customSoundRef.current.pause()
+      customSoundRef.current = null
+    }
   }
 
-  const handleStageComplete = () => {
-    if (settings?.enableVibration) {
-      vibrateDevice([200, 100, 200, 100, 400])
+  const handleStageComplete = (stage: Stage) => {
+    stopAllEffects()
+
+    if (stage.endSettings.enableVibration) {
+      if (stage.endSettings.vibrationPattern) {
+        vibrateDevice(stage.endSettings.vibrationPattern)
+      } else {
+        vibrateDevice([200, 100, 200, 100, 400])
+      }
     }
 
     if (!settings?.muteAudio) {
-      playBeep()
+      if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
+        playEndSound(stage.endSettings.soundFile)
+      } else {
+        playBeep()
+      }
     }
 
     if (settings?.showFullscreenAlert) {
       setShowAlert(true)
+    }
+  }
+
+  const playEndSound = (soundDataUrl: string) => {
+    try {
+      const audio = new Audio(soundDataUrl)
+      audio.volume = 0.5
+      audio.play().catch((e) => console.error('Failed to play end sound', e))
+    } catch (e) {
+      console.error('Failed to load end sound', e)
     }
   }
 
@@ -194,7 +255,16 @@ function App() {
       name: `阶段 ${stages.length + 1}`,
       duration: 5,
       unit: 'minutes',
-      randomSound: false,
+      runningSettings: {
+        randomSound: false,
+        wallpaperMode: 'random',
+        enableVibration: true,
+      },
+      endSettings: {
+        randomSound: false,
+        wallpaperMode: 'random',
+        enableVibration: true,
+      },
     }
     setStages((current) => [...(current || []), newStage])
   }
@@ -284,6 +354,14 @@ function App() {
                     <SelectItem value="days">天</SelectItem>
                   </SelectContent>
                 </Select>
+                <StageSettingsDialog
+                  stage={stage}
+                  onUpdate={(updates) => updateStage(stage.id, updates)}
+                >
+                  <Button variant="outline" size="icon">
+                    <GearSix />
+                  </Button>
+                </StageSettingsDialog>
                 <Button onClick={() => deleteStage(stage.id)} variant="destructive" size="icon">
                   <Trash />
                 </Button>
@@ -383,22 +461,30 @@ function App() {
       </div>
 
       <Dialog open={showAlert} onOpenChange={setShowAlert}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-center">阶段完成</DialogTitle>
-          </DialogHeader>
-          <div className="text-center space-y-4 py-6">
-            <p className="text-lg">
-              <span className="font-semibold text-primary">{currentStage?.name}</span> 已完成
-            </p>
-            {stages[timerState.currentStageIndex[0]] && (
-              <p className="text-muted-foreground">
-                下一阶段: <span className="font-medium">{stages[timerState.currentStageIndex[0]]?.name}</span>
+        <DialogContent className="sm:max-w-md relative overflow-hidden">
+          {currentStage && currentStage.endSettings.wallpaper && (
+            <div 
+              className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
+              style={{ backgroundImage: `url(${currentStage.endSettings.wallpaper})` }}
+            />
+          )}
+          <div className="relative z-10">
+            <DialogHeader>
+              <DialogTitle className="text-2xl text-center">阶段完成</DialogTitle>
+            </DialogHeader>
+            <div className="text-center space-y-4 py-6">
+              <p className="text-lg">
+                <span className="font-semibold text-primary">{currentStage?.name}</span> 已完成
               </p>
-            )}
-            <Button onClick={() => setShowAlert(false)} className="w-full">
-              继续
-            </Button>
+              {stages[timerState.currentStageIndex[0]] && (
+                <p className="text-muted-foreground">
+                  下一阶段: <span className="font-medium">{stages[timerState.currentStageIndex[0]]?.name}</span>
+                </p>
+              )}
+              <Button onClick={() => setShowAlert(false)} className="w-full">
+                继续
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

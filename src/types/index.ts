@@ -7,11 +7,24 @@ export interface Stage {
   name: string
   duration: number
   unit: TimeUnit
-  soundFile?: string
-  randomSound: boolean
-  soundCategory?: string
-  backgroundNoise?: string
-  vibrationPattern?: number[]
+  runningSettings: {
+    soundFile?: string
+    randomSound: boolean
+    soundCategory?: string
+    wallpaper?: string
+    wallpaperMode: 'fixed' | 'random'
+    vibrationPattern?: number[]
+    enableVibration: boolean
+  }
+  endSettings: {
+    soundFile?: string
+    randomSound: boolean
+    soundCategory?: string
+    wallpaper?: string
+    wallpaperMode: 'fixed' | 'random'
+    vibrationPattern?: number[]
+    enableVibration: boolean
+  }
 }
 
 export interface Loop {
