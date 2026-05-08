@@ -22,6 +22,18 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
   const wallpaperRunningRef = useRef<HTMLInputElement>(null)
   const wallpaperEndRef = useRef<HTMLInputElement>(null)
 
+  const runningSettings = stage.runningSettings || {
+    randomSound: false,
+    wallpaperMode: 'random' as const,
+    enableVibration: true,
+  }
+
+  const endSettings = stage.endSettings || {
+    randomSound: false,
+    wallpaperMode: 'random' as const,
+    enableVibration: true,
+  }
+
   const handleFileUpload = (
     file: File | undefined,
     type: 'sound-running' | 'sound-end' | 'wallpaper-running' | 'wallpaper-end'
@@ -32,10 +44,21 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
       
+      const runningSettings = stage.runningSettings || {
+        randomSound: false,
+        wallpaperMode: 'random' as const,
+        enableVibration: true,
+      }
+      const endSettings = stage.endSettings || {
+        randomSound: false,
+        wallpaperMode: 'random' as const,
+        enableVibration: true,
+      }
+
       if (type === 'sound-running') {
         onUpdate({
           runningSettings: {
-            ...stage.runningSettings,
+            ...runningSettings,
             soundFile: dataUrl,
           },
         })
@@ -43,7 +66,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       } else if (type === 'sound-end') {
         onUpdate({
           endSettings: {
-            ...stage.endSettings,
+            ...endSettings,
             soundFile: dataUrl,
           },
         })
@@ -51,7 +74,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       } else if (type === 'wallpaper-running') {
         onUpdate({
           runningSettings: {
-            ...stage.runningSettings,
+            ...runningSettings,
             wallpaper: dataUrl,
           },
         })
@@ -59,7 +82,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       } else if (type === 'wallpaper-end') {
         onUpdate({
           endSettings: {
-            ...stage.endSettings,
+            ...endSettings,
             wallpaper: dataUrl,
           },
         })
@@ -94,11 +117,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>随机音效</Label>
                   <Switch
-                    checked={stage.runningSettings.randomSound}
+                    checked={runningSettings.randomSound}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         runningSettings: {
-                          ...stage.runningSettings,
+                          ...runningSettings,
                           randomSound: checked,
                         },
                       })
@@ -106,7 +129,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   />
                 </div>
 
-                {!stage.runningSettings.randomSound && (
+                {!runningSettings.randomSound && (
                   <div className="space-y-2">
                     <Label>上传音效文件</Label>
                     <div className="flex gap-2">
@@ -125,13 +148,13 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         <Upload className="mr-2" />
                         选择音效
                       </Button>
-                      {stage.runningSettings.soundFile && (
+                      {runningSettings.soundFile && (
                         <Button
                           variant="secondary"
                           onClick={() =>
                             onUpdate({
                               runningSettings: {
-                                ...stage.runningSettings,
+                                ...runningSettings,
                                 soundFile: undefined,
                               },
                             })
@@ -141,7 +164,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
-                    {stage.runningSettings.soundFile && (
+                    {runningSettings.soundFile && (
                       <p className="text-sm text-muted-foreground">已上传音效文件</p>
                     )}
                   </div>
@@ -159,11 +182,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>随机壁纸</Label>
                   <Switch
-                    checked={stage.runningSettings.wallpaperMode === 'random'}
+                    checked={runningSettings.wallpaperMode === 'random'}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         runningSettings: {
-                          ...stage.runningSettings,
+                          ...runningSettings,
                           wallpaperMode: checked ? 'random' : 'fixed',
                         },
                       })
@@ -171,7 +194,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   />
                 </div>
 
-                {stage.runningSettings.wallpaperMode === 'fixed' && (
+                {runningSettings.wallpaperMode === 'fixed' && (
                   <div className="space-y-2">
                     <Label>上传壁纸文件</Label>
                     <div className="flex gap-2">
@@ -190,13 +213,13 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         <Upload className="mr-2" />
                         选择壁纸
                       </Button>
-                      {stage.runningSettings.wallpaper && (
+                      {runningSettings.wallpaper && (
                         <Button
                           variant="secondary"
                           onClick={() =>
                             onUpdate({
                               runningSettings: {
-                                ...stage.runningSettings,
+                                ...runningSettings,
                                 wallpaper: undefined,
                               },
                             })
@@ -206,7 +229,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
-                    {stage.runningSettings.wallpaper && (
+                    {runningSettings.wallpaper && (
                       <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
                     )}
                   </div>
@@ -224,11 +247,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>启用震动</Label>
                   <Switch
-                    checked={stage.runningSettings.enableVibration}
+                    checked={runningSettings.enableVibration}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         runningSettings: {
-                          ...stage.runningSettings,
+                          ...runningSettings,
                           enableVibration: checked,
                         },
                       })
@@ -250,11 +273,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>随机音效</Label>
                   <Switch
-                    checked={stage.endSettings.randomSound}
+                    checked={endSettings.randomSound}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         endSettings: {
-                          ...stage.endSettings,
+                          ...endSettings,
                           randomSound: checked,
                         },
                       })
@@ -262,7 +285,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   />
                 </div>
 
-                {!stage.endSettings.randomSound && (
+                {!endSettings.randomSound && (
                   <div className="space-y-2">
                     <Label>上传音效文件</Label>
                     <div className="flex gap-2">
@@ -281,13 +304,13 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         <Upload className="mr-2" />
                         选择音效
                       </Button>
-                      {stage.endSettings.soundFile && (
+                      {endSettings.soundFile && (
                         <Button
                           variant="secondary"
                           onClick={() =>
                             onUpdate({
                               endSettings: {
-                                ...stage.endSettings,
+                                ...endSettings,
                                 soundFile: undefined,
                               },
                             })
@@ -297,7 +320,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
-                    {stage.endSettings.soundFile && (
+                    {endSettings.soundFile && (
                       <p className="text-sm text-muted-foreground">已上传音效文件</p>
                     )}
                   </div>
@@ -315,11 +338,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>随机壁纸</Label>
                   <Switch
-                    checked={stage.endSettings.wallpaperMode === 'random'}
+                    checked={endSettings.wallpaperMode === 'random'}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         endSettings: {
-                          ...stage.endSettings,
+                          ...endSettings,
                           wallpaperMode: checked ? 'random' : 'fixed',
                         },
                       })
@@ -327,7 +350,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   />
                 </div>
 
-                {stage.endSettings.wallpaperMode === 'fixed' && (
+                {endSettings.wallpaperMode === 'fixed' && (
                   <div className="space-y-2">
                     <Label>上传壁纸文件</Label>
                     <div className="flex gap-2">
@@ -346,13 +369,13 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         <Upload className="mr-2" />
                         选择壁纸
                       </Button>
-                      {stage.endSettings.wallpaper && (
+                      {endSettings.wallpaper && (
                         <Button
                           variant="secondary"
                           onClick={() =>
                             onUpdate({
                               endSettings: {
-                                ...stage.endSettings,
+                                ...endSettings,
                                 wallpaper: undefined,
                               },
                             })
@@ -362,7 +385,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
-                    {stage.endSettings.wallpaper && (
+                    {endSettings.wallpaper && (
                       <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
                     )}
                   </div>
@@ -380,11 +403,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 <div className="flex items-center justify-between">
                   <Label>启用震动</Label>
                   <Switch
-                    checked={stage.endSettings.enableVibration}
+                    checked={endSettings.enableVibration}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         endSettings: {
-                          ...stage.endSettings,
+                          ...endSettings,
                           enableVibration: checked,
                         },
                       })

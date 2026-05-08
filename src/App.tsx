@@ -89,6 +89,8 @@ function App() {
   }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings])
 
   const playStageRunningEffects = (stage: Stage) => {
+    if (!stage.runningSettings) return
+
     if (!settings?.muteAudio && stage.runningSettings.soundFile && !stage.runningSettings.randomSound) {
       playCustomSound(stage.runningSettings.soundFile)
     } else if (!settings?.muteAudio) {
@@ -163,7 +165,7 @@ function App() {
   const handleStageComplete = (stage: Stage) => {
     stopAllEffects()
 
-    if (stage.endSettings.enableVibration) {
+    if (stage.endSettings?.enableVibration) {
       if (stage.endSettings.vibrationPattern) {
         vibrateDevice(stage.endSettings.vibrationPattern)
       } else {
@@ -171,7 +173,7 @@ function App() {
       }
     }
 
-    if (!settings?.muteAudio) {
+    if (!settings?.muteAudio && stage.endSettings) {
       if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
         playEndSound(stage.endSettings.soundFile)
       } else {
@@ -464,7 +466,7 @@ function App() {
 
       <Dialog open={showAlert} onOpenChange={setShowAlert}>
         <DialogContent className="sm:max-w-md relative overflow-hidden">
-          {completedStage && completedStage.endSettings.wallpaper && (
+          {completedStage && completedStage.endSettings?.wallpaper && (
             <div 
               className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
               style={{ backgroundImage: `url(${completedStage.endSettings.wallpaper})` }}
