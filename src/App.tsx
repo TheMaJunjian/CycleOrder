@@ -32,6 +32,7 @@ function App() {
   })
 
   const [showAlert, setShowAlert] = useState(false)
+  const [completedStage, setCompletedStage] = useState<Stage | null>(null)
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -179,6 +180,7 @@ function App() {
     }
 
     if (settings?.showFullscreenAlert) {
+      setCompletedStage(stage)
       setShowAlert(true)
     }
   }
@@ -462,10 +464,10 @@ function App() {
 
       <Dialog open={showAlert} onOpenChange={setShowAlert}>
         <DialogContent className="sm:max-w-md relative overflow-hidden">
-          {currentStage && currentStage.endSettings.wallpaper && (
+          {completedStage && completedStage.endSettings.wallpaper && (
             <div 
               className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
-              style={{ backgroundImage: `url(${currentStage.endSettings.wallpaper})` }}
+              style={{ backgroundImage: `url(${completedStage.endSettings.wallpaper})` }}
             />
           )}
           <div className="relative z-10">
@@ -474,11 +476,11 @@ function App() {
             </DialogHeader>
             <div className="text-center space-y-4 py-6">
               <p className="text-lg">
-                <span className="font-semibold text-primary">{currentStage?.name}</span> 已完成
+                <span className="font-semibold text-primary">{completedStage?.name}</span> 已完成
               </p>
-              {stages[timerState.currentStageIndex[0]] && (
+              {currentStage && (
                 <p className="text-muted-foreground">
-                  下一阶段: <span className="font-medium">{stages[timerState.currentStageIndex[0]]?.name}</span>
+                  下一阶段: <span className="font-medium">{currentStage.name}</span>
                 </p>
               )}
               <Button onClick={() => setShowAlert(false)} className="w-full">
