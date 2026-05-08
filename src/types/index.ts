@@ -19,6 +19,9 @@ export interface Stage {
   unit: TimeUnit
   runningSettings: StageSettings
   endSettings: StageSettings
+  isEmbeddedStrategy?: boolean
+  embeddedStrategyId?: string
+  embeddedStrategyStages?: Stage[]
 }
 
 export interface Loop {
@@ -58,6 +61,8 @@ export interface TimerState {
   currentLoopIteration: number[]
 }
 
+export type StrategyLoadMode = 'expand' | 'embed'
+
 export interface Strategy {
   id: string
   name: string
@@ -67,4 +72,6 @@ export interface Strategy {
   settings: Settings
   createdAt: number
   updatedAt: number
+  loadMode?: StrategyLoadMode
+  isCollapsed?: boolean
 }

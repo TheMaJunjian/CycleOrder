@@ -1,23 +1,23 @@
 import { useState } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Strategy, Stage, Loop, Settings } from '@/types'
+import { Strategy, Stage, Loop, Settings, StrategyLoadMode } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus } from '@phosphor-icons/react'
+import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus, CaretDown, CaretUp, StackMinus } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { generateId } from '@/lib/timer-utils'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils'
+import { Badge } from '@/components/ui/badge'
 
 interface StrategyManagementDialogProps {
   children: React.ReactNode
   currentStages: Stage[]
   currentLoop: Loop
   currentSettings: Settings
-  onLoadStrategy: (stages: Stage[], mode: 'expand' | 'embed') => void
+  onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
 }
 
 export function StrategyManagementDialog({
@@ -31,11 +31,15 @@ export function StrategyManagementDialog({
   const [strategies, setStrategies] = useKV<Strategy[]>('saved-strategies', [])
   const [newStrategyName, setNewStrategyName] = useState('')
   const [newStrategyDescription, setNewStrategyDescription] = useState('')
-  const [loadMode, setLoadMode] = useState<'expand' | 'embed'>('expand')
 
   const handleSaveCurrentStrategy = () => {
     if (!newStrategyName.trim()) {
       toast.error('请输入策略名称')
+      return
+    }
+
+    if (!currentStages || currentStages.length === 0) {
+      toast.error('当前没有阶段，无法保存策略')
       return
     }
 
@@ -48,6 +52,8 @@ export function StrategyManagementDialog({
       settings: currentSettings,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      loadMode: 'expand',
+      isCollapsed: false,
     }
 
     setStrategies((current) => [...(current || []), newStrategy])
@@ -57,14 +63,43 @@ export function StrategyManagementDialog({
   }
 
   const handleLoadStrategy = (strategy: Strategy) => {
-    onLoadStrategy(strategy.stages, loadMode)
-    toast.success(`策略"${strategy.name}"已${loadMode === 'expand' ? '展开' : '嵌入'}加载`)
+    const mode = strategy.loadMode || 'expand'
+    onLoadStrategy(strategy.stages, mode, strategy.id, strategy.name)
+    toast.success(`策略"${strategy.name}"已${mode === 'expand' ? '展开' : '嵌入'}加载`)
     setOpen(false)
   }
 
   const handleDeleteStrategy = (id: string) => {
     setStrategies((current) => (current || []).filter((s) => s.id !== id))
     toast.success('策略已删除')
+  }
+
+  const toggleStrategyLoadMode = (id: string) => {
+    setStrategies((current) => 
+      (current || []).map((s) => 
+        s.id === id 
+          ? { ...s, loadMode: (s.loadMode === 'expand' ? 'embed' : 'expand') as StrategyLoadMode }
+          : s
+      )
+    )
+  }
+
+  const toggleStrategyCollapsed = (id: string) => {
+    setStrategies((current) => 
+      (current || []).map((s) => 
+        s.id === id 
+          ? { ...s, isCollapsed: !s.isCollapsed }
+          : s
+      )
+    )
+  }
+
+  const getTotalDuration = (stages: Stage[]): string => {
+    let totalMs = 0
+    stages.forEach((stage) => {
+      totalMs += convertToMilliseconds(stage.duration, stage.unit)
+    })
+    return formatTime(totalMs)
   }
 
   return (
@@ -102,33 +137,24 @@ export function StrategyManagementDialog({
                   rows={2}
                 />
               </div>
-              <Button onClick={handleSaveCurrentStrategy} className="w-full">
+              <Button 
+                onClick={handleSaveCurrentStrategy} 
+                className="w-full"
+                disabled={!currentStages || currentStages.length === 0}
+              >
                 <FloppyDisk className="mr-2" />
                 保存策略
               </Button>
+              {(!currentStages || currentStages.length === 0) && (
+                <p className="text-sm text-destructive text-center">请先添加阶段才能保存策略</p>
+              )}
             </div>
           </Card>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <FolderOpen className="text-primary" size={20} />
-                <h3 className="text-lg font-semibold">已保存的策略</h3>
-              </div>
-              {strategies && strategies.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">加载模式:</Label>
-                  <Select value={loadMode} onValueChange={(v: 'expand' | 'embed') => setLoadMode(v)}>
-                    <SelectTrigger className="w-28">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="expand">展开</SelectItem>
-                      <SelectItem value="embed">嵌入</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <FolderOpen className="text-primary" size={20} />
+              <h3 className="text-lg font-semibold">已保存的策略</h3>
             </div>
 
             <div className="space-y-3">
@@ -148,38 +174,83 @@ export function StrategyManagementDialog({
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{strategy.description}</p>
                           )}
                         </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => toggleStrategyCollapsed(strategy.id)}
+                            title={strategy.isCollapsed ? '展开详情' : '折叠详情'}
+                          >
+                            {strategy.isCollapsed ? <CaretDown /> : <CaretUp />}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => handleDeleteStrategy(strategy.id)}
+                          >
+                            <Trash />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {!strategy.isCollapsed && (
+                        <>
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="secondary">
+                              {strategy.stages.length} 个阶段
+                            </Badge>
+                            <Badge variant="secondary">
+                              总时长: {getTotalDuration(strategy.stages)}
+                            </Badge>
+                            <Badge variant="secondary">
+                              {strategy.loop.loopMode === 'infinite' && '无限循环'}
+                              {strategy.loop.loopMode === 'fixed-count' && `${strategy.loop.loopCount}次循环`}
+                              {strategy.loop.loopMode === 'time-limited' && '限时循环'}
+                            </Badge>
+                            <Badge variant="secondary">
+                              {new Date(strategy.createdAt).toLocaleDateString()}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-muted/20 p-2 rounded">
+                            <div>
+                              <span className="font-medium">阶段列表:</span>
+                              <div className="mt-1 space-y-1">
+                                {strategy.stages.slice(0, 3).map((stage, idx) => (
+                                  <div key={idx} className="text-muted-foreground">
+                                    {idx + 1}. {stage.name} ({stage.duration}{stage.unit === 'minutes' ? '分' : stage.unit === 'seconds' ? '秒' : stage.unit === 'hours' ? '时' : ''})
+                                  </div>
+                                ))}
+                                {strategy.stages.length > 3 && (
+                                  <div className="text-muted-foreground">
+                                    ...还有 {strategy.stages.length - 3} 个阶段
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <div className="flex gap-2">
                         <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => handleDeleteStrategy(strategy.id)}
-                          className="shrink-0"
+                          onClick={() => toggleStrategyLoadMode(strategy.id)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
                         >
-                          <Trash />
+                          {strategy.loadMode === 'expand' ? <ListPlus className="mr-2" /> : <StackMinus className="mr-2" />}
+                          {strategy.loadMode === 'expand' ? '展开模式' : '嵌入模式'}
+                        </Button>
+                        <Button
+                          onClick={() => handleLoadStrategy(strategy)}
+                          variant="default"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          加载策略
                         </Button>
                       </div>
-
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {strategy.stages.length} 个阶段
-                        </span>
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {strategy.loop.loopMode === 'infinite' && '无限循环'}
-                          {strategy.loop.loopMode === 'fixed-count' && `${strategy.loop.loopCount}次循环`}
-                          {strategy.loop.loopMode === 'time-limited' && '限时循环'}
-                        </span>
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {new Date(strategy.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <Button
-                        onClick={() => handleLoadStrategy(strategy)}
-                        variant="secondary"
-                        className="w-full"
-                      >
-                        <ListPlus className="mr-2" />
-                        {loadMode === 'expand' ? '展开加载' : '嵌入为单阶段'}
-                      </Button>
                     </div>
                   </Card>
                 ))
