@@ -19,9 +19,9 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md w-[95vw] sm:w-full">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
+          <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
             <Repeat className="text-primary" />
             循环设置
           </DialogTitle>
