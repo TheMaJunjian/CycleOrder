@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, ReactNode } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { Strategy, Stage, Loop, Settings, StrategyLoadMode } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -13,18 +13,19 @@ import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils
 import { Badge } from '@/components/ui/badge'
 
 interface StrategyManagementDialogProps {
-interface StrategyManagementDialogProps {
   currentStages: Stage[]
   currentLoop: Loop
   currentSettings: Settings
   onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
+  children: ReactNode
+}
 
-}xport function StrategyManagementDialog({
-
+export function StrategyManagementDialog({
   currentStages,
   currentLoop,
   currentSettings,
   onLoadStrategy,
+  children,
 }: StrategyManagementDialogProps) {
   const [open, setOpen] = useState(false)
   const [strategies, setStrategies] = useKV<Strategy[]>('saved-strategies', [])
@@ -32,49 +33,58 @@ interface StrategyManagementDialogProps {
   const [newStrategyDescription, setNewStrategyDescription] = useState('')
 
   const handleSaveCurrentStrategy = () => {
-
-  const handleSaveCurrentStrategy = () => {
+    if (!newStrategyName.trim()) {
+      toast.error('请输入策略名称')
       return
     }
 
     if (!currentStages || currentStages.length === 0) {
       toast.error('当前没有阶段，无法保存策略')
+      return
     }
 
-    const newStrategy: Strategy = {
-      id: generateId(),
-      name: newStrategyName.trim(),
     const newStrategy: Strategy = {
       id: generateId(),
       name: newStrategyName.trim(),
       description: newStrategyDescription.trim(),
       stages: currentStages,
       loop: currentLoop,
+      settings: currentSettings,
       loadMode: 'expand',
       isCollapsed: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     }
-      loadMode: 'expand',
-      isCollapsed: false,
+
+    setStrategies((current) => [...(current || []), newStrategy])
     setNewStrategyName('')
     setNewStrategyDescription('')
     toast.success(`策略"${newStrategy.name}"已保存`)
   }
 
   const handleLoadStrategy = (strategy: Strategy) => {
-  }adMode || 'expand'
-gy.stages, mode, strategy.id, strategy.name)
-    toast.success(`策略"${strategy.name}"已${mode === 'expand' ? '展开' : '嵌入'}加载`)
     const mode = strategy.loadMode || 'expand'
     onLoadStrategy(strategy.stages, mode, strategy.id, strategy.name)
     toast.success(`策略"${strategy.name}"已${mode === 'expand' ? '展开' : '嵌入'}加载`)
+  }
+
   const handleDeleteStrategy = (id: string) => {
     setStrategies((current) => (current || []).filter((s) => s.id !== id))
     toast.success('策略已删除')
   }
 
   const toggleStrategyLoadMode = (id: string) => {
+    setStrategies((current) =>
+      (current || []).map((s) => 
+        s.id === id 
+          ? { ...s, loadMode: s.loadMode === 'expand' ? 'embed' : 'expand' }
+          : s
+      )
+    )
   }
 
+  const toggleStrategyCollapsed = (id: string) => {
+    setStrategies((current) =>
       (current || []).map((s) => 
         s.id === id 
           ? { ...s, isCollapsed: !s.isCollapsed }
@@ -91,10 +101,6 @@ gy.stages, mode, strategy.id, strategy.name)
     return formatTime(totalMs)
   }
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -124,6 +130,9 @@ gy.stages, mode, strategy.id, strategy.name)
               <div className="space-y-2">
                 <Label>策略描述（可选）</Label>
                 <Textarea
+                  value={newStrategyDescription}
+                  onChange={(e) => setNewStrategyDescription(e.target.value)}
+                  placeholder="描述这个策略的用途..."
                 />
               </div>
               <Button 
