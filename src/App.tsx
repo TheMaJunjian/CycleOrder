@@ -522,7 +522,7 @@ function App() {
 
   const getLoopModeLabel = (mode: LoopMode): string => {
     switch (mode) {
-      case 'infinite': return '无限�������环'
+      case 'infinite': return '无限���������环'
       case 'fixed-count': return '固定次数循环'
       case 'time-limited': return '限定时长循环'
       default: return '无限循环'
@@ -711,8 +711,8 @@ function App() {
                         type="number"
                         value={stage.duration}
                         onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
-                        className="flex-1 sm:flex-initial sm:w-24"
-                      />
+                        value={stage.duration}
+                        onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
                       <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
                         <SelectTrigger className="flex-1 sm:flex-initial sm:w-32">
                           <SelectValue />
@@ -855,13 +855,11 @@ function App() {
                 <p className="text-muted-foreground">
                   下一阶段: <span className="font-medium">{currentStage.name}</span>
                 </p>
-              )}
+                  下一阶段: <span className="font-medium">{currentStage.name}</span>
             </div>
-          </div>
-        </DialogContent>
       </Dialog>
     </div>
   )
-}
-
+        </DialogContent>
+      </Dialog>
 export default App
