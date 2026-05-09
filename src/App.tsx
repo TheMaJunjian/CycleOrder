@@ -639,19 +639,18 @@ function App() {
             <div className="space-y-2">
               <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
               <p className="text-xs text-muted-foreground">剩余时间</p>
-            </div>
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-100 rounded-full"
-                style={{
-                  width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
-                }}
-              />
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-100 rounded-full"
+                  style={{
+                    width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
+                  }}
+                />
+              </div>
             </div>
             <div className="flex flex-wrap gap-2 justify-center items-center text-xs">
-              <Badge variant="outline" className="gap-1.5">
-                <Repeat size={14} />
-                {getLoopModeLabel(loop.loopMode)}
+              <Badge variant="outline">
+                阶段 {timerState.currentStageIndex[0] + 1} / {stages.length}
               </Badge>
               {loop.loopMode === 'fixed-count' && loop.loopCount && (
                 <Badge variant="secondary">
