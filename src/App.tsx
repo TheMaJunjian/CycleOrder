@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy } from '@/types'
+import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, vibrateDevice, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,6 +33,7 @@ function App() {
     enableVibration: true,
     muteAudio: false,
   })
+  const [appState, setAppState] = useKV<AppState>('app-state', {})
   
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
@@ -109,15 +110,16 @@ function App() {
           
           const alertTime = currentStage.endSettings?.alertTime ?? 0
           const alertTimeUnit = currentStage.endSettings?.alertTimeUnit ?? 'seconds'
-          const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
+          const alertTiming = currentStage.endSettings?.alertTiming ?? 'inside'
+          const alertTimeMs = convertToMilliseconds(Math.abs(alertTime), alertTimeUnit)
           
           if (alertTime !== 0 && !isPlayingAlert) {
-            if (alertTime > 0) {
+            if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
                 playAlertSound(currentStage)
               }
-            } else if (alertTime < 0) {
+            } else {
               const alertStartTime = stageDuration
               if (newElapsed >= alertStartTime && prev.currentStageElapsed < alertStartTime) {
                 playAlertSound(currentStage)
@@ -170,7 +172,7 @@ function App() {
             }
             
             const nextStage = stages[nextStageIndex]
-            if (nextStage && nextStage.endSettings?.alertTime && nextStage.endSettings.alertTime < 0) {
+            if (nextStage && nextStage.endSettings?.alertTime && nextStage.endSettings?.alertTiming === 'outside') {
               playAlertSound(nextStage)
             }
             
@@ -588,6 +590,7 @@ function App() {
     setStages(strategy.stages)
     setLoop(strategy.loop)
     setSettings(strategy.settings)
+    setAppState({ currentStrategyName: strategy.name })
     setTimerState({
       isRunning: true,
       isPaused: false,
@@ -613,7 +616,7 @@ function App() {
     }
   }
 
-  if (!stages || !settings || !loop) {
+  if (!stages || !settings || !loop || !appState) {
     return <div className="min-h-screen bg-background flex items-center justify-center">
       <p className="text-muted-foreground">加载中...</p>
     </div>
@@ -629,6 +632,12 @@ function App() {
 
         {timerState.isRunning && currentStage && (
           <Card className="p-6 md:p-8 text-center space-y-5 border-2">
+            {appState.currentStrategyName && (
+              <div className="space-y-1 pb-2 border-b border-border/50">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前策略</p>
+                <h3 className="text-lg font-semibold text-foreground">{appState.currentStrategyName}</h3>
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">{currentStage.name}</h2>

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Stage, TimeUnit } from '@/types'
+import { Stage, TimeUnit, AlertTiming } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -271,23 +271,49 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
               </div>
               
               <div className="space-y-3 pl-9">
-                <p className="text-sm text-muted-foreground">设置阶段结束前多长时间开始播放提示音效</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={endSettings.alertTime ?? 0}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0
+                <p className="text-sm text-muted-foreground">设置提示播放的时间和位置</p>
+                
+                <div className="space-y-2">
+                  <Label>提示位置</Label>
+                  <Select 
+                    value={endSettings.alertTiming ?? 'inside'} 
+                    onValueChange={(value: AlertTiming) =>
                       onUpdate({
                         endSettings: {
                           ...endSettings,
-                          alertTime: value,
+                          alertTiming: value,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inside">阶段内</SelectItem>
+                      <SelectItem value="outside">阶段外</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={Math.abs(endSettings.alertTime ?? 0)}
+                    onChange={(e) => {
+                      const value = parseFloat(e.target.value) || 0
+                      const timing = endSettings.alertTiming ?? 'inside'
+                      onUpdate({
+                        endSettings: {
+                          ...endSettings,
+                          alertTime: timing === 'inside' ? value : -value,
                         },
                       })
                     }}
                     className="w-32"
                     placeholder="0"
                     step="0.1"
+                    min="0"
                   />
                   <Select 
                     value={endSettings.alertTimeUnit ?? 'seconds'} 
@@ -314,9 +340,8 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 </div>
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>• 为 0 时不播放提示</p>
-                  <p>• 大于 0 时，在阶段结束前指定时间开始播放</p>
-                  <p>• 超过阶段时长时，整个阶段都播放提示音效</p>
-                  <p>• 小于 0 时，占用下一阶段的时长播放</p>
+                  <p>• <strong>阶段内</strong>：在当前阶段结束前指定时间开始播放</p>
+                  <p>• <strong>阶段外</strong>：占用下一阶段的时长播放提示音效</p>
                 </div>
               </div>
             </div>

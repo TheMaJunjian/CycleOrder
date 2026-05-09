@@ -2,6 +2,8 @@ export type TimeUnit = 'nanoseconds' | 'microseconds' | 'milliseconds' | 'second
 
 export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited'
 
+export type AlertTiming = 'inside' | 'outside'
+
 export interface StageSettings {
   soundFile?: string
   randomSound: boolean
@@ -12,6 +14,7 @@ export interface StageSettings {
   enableVibration: boolean
   alertTime?: number
   alertTimeUnit?: TimeUnit
+  alertTiming?: AlertTiming
 }
 
 export interface Stage {
@@ -77,4 +80,8 @@ export interface Strategy {
   updatedAt: number
   loadMode?: StrategyLoadMode
   isCollapsed?: boolean
+}
+
+export interface AppState {
+  currentStrategyName?: string
 }
