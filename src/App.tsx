@@ -555,56 +555,56 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background p-4 md:p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">环序</h1>
-          <p className="text-muted-foreground">CycleOrder - 多阶段循环计时器</p>
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
+      <div className="mx-auto max-w-5xl space-y-5">
+        <div className="text-center space-y-1 pb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
+          <p className="text-sm text-muted-foreground">多阶段循环计时器</p>
         </div>
 
         {timerState.isRunning && currentStage && (
-          <Card className="p-8 text-center space-y-4 bg-card/80 backdrop-blur">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">当前阶段</p>
-              <h2 className="text-3xl font-bold text-primary">{currentStage.name}</h2>
+          <Card className="p-6 md:p-8 text-center space-y-5 border-2">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">{currentStage.name}</h2>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">剩余时间</p>
-              <div className="text-5xl font-bold text-accent">{formatTime(remainingTime)}</div>
+              <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime)}</div>
+              <p className="text-xs text-muted-foreground">剩余时间</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Repeat size={16} />
-                <span className="text-center">{getLoopModeLabel(loop.loopMode)}</span>
-              </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-100 rounded-full"
+                style={{
+                  width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
+                }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center items-center text-xs">
+              <Badge variant="outline" className="gap-1.5">
+                <Repeat size={14} />
+                {getLoopModeLabel(loop.loopMode)}
+              </Badge>
               {loop.loopMode === 'fixed-count' && loop.loopCount && (
                 <Badge variant="secondary">
                   第 {(loop.currentIteration || 0) + 1} / {loop.loopCount} 次
                 </Badge>
               )}
               {loop.loopMode === 'time-limited' && loop.loopDuration && loop.loopDurationUnit && (
-                <Badge variant="secondary" className="text-center">
-                  已用 {formatTime(loop.totalElapsed || 0)} / {loop.loopDuration} {loop.loopDurationUnit}
+                <Badge variant="secondary">
+                  {formatTime(loop.totalElapsed || 0)} / {loop.loopDuration} {loop.loopDurationUnit}
                 </Badge>
               )}
               {loop.loopMode === 'infinite' && (
-                <Badge variant="secondary">第 {(loop.currentIteration || 0) + 1} 次循环</Badge>
+                <Badge variant="secondary">第 {(loop.currentIteration || 0) + 1} 次</Badge>
               )}
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-100"
-                style={{
-                  width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
-                }}
-              />
             </div>
           </Card>
         )}
 
-        <Card className="p-4 sm:p-6 space-y-6">
+        <Card className="p-4 md:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h3 className="text-xl font-semibold">阶段设置</h3>
+            <h3 className="text-lg font-semibold">阶段列表</h3>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {selectedStageIds.size > 0 && (
                 <>
@@ -614,17 +614,16 @@ function App() {
                     variant="secondary"
                     className="flex-1 sm:flex-initial"
                   >
-                    <Unite className="mr-2" />
-                    <span className="hidden sm:inline">合并选中 ({selectedStageIds.size})</span>
-                    <span className="sm:hidden">合并 ({selectedStageIds.size})</span>
+                    <Unite size={16} className="mr-1.5" />
+                    合并 ({selectedStageIds.size})
                   </Button>
                   <Button 
                     onClick={clearSelection} 
                     size="sm" 
-                    variant="outline"
+                    variant="ghost"
                     className="flex-1 sm:flex-initial"
                   >
-                    取消选择
+                    取消
                   </Button>
                 </>
               )}
@@ -636,27 +635,24 @@ function App() {
                 onRunStrategy={handleRunStrategy}
               >
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
-                  <StackSimple className="mr-2" />
-                  <span className="hidden sm:inline">策略管理</span>
-                  <span className="sm:hidden">策略</span>
+                  <StackSimple size={16} className="mr-1.5" />
+                  策略
                 </Button>
               </StrategyManagementDialog>
               <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
-                  <Repeat className="mr-2" />
-                  <span className="hidden sm:inline">循环设置</span>
-                  <span className="sm:hidden">循环</span>
+                  <Repeat size={16} className="mr-1.5" />
+                  循环
                 </Button>
               </LoopSettingsDialog>
               <Button onClick={addStage} size="sm" className="flex-1 sm:flex-initial">
-                <Plus className="mr-2" />
-                <span className="hidden sm:inline">添加阶段</span>
-                <span className="sm:hidden">添加</span>
+                <Plus size={16} className="mr-1.5" />
+                添加
               </Button>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {stages.map((stage, index) => {
               const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
@@ -681,46 +677,42 @@ function App() {
                 <div 
                   key={stage.id} 
                   onClick={() => toggleStageSelection(stage.id)}
-                  className={`p-3 rounded-lg space-y-3 transition-colors cursor-pointer ${
+                  className={`p-3 rounded-lg space-y-2.5 transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-primary/10 border-2 border-primary' 
-                      : 'bg-muted/50 border-2 border-transparent hover:bg-muted'
+                      ? 'bg-primary/10 border border-primary shadow-sm' 
+                      : 'bg-muted/40 border border-transparent hover:bg-muted/60'
                   }`}
                 >
-                  <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={(e) => toggleStageSelection(stage.id, e as any)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 shrink-0 cursor-pointer"
+                      className="w-4 h-4 shrink-0 cursor-pointer accent-primary"
                       aria-label="选择阶段"
                     />
-                    <span className="text-sm font-medium text-muted-foreground w-6 sm:w-8 text-center shrink-0">{index + 1}</span>
+                    <span className="text-xs font-medium text-muted-foreground w-5 text-center shrink-0">#{index + 1}</span>
                     <Input
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
                       disabled={isMerged}
-                      className="flex-1 min-w-0"
+                      className="flex-1 min-w-0 h-9"
+                      placeholder="阶段名称"
                     />
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Clock size={16} className="hidden sm:inline" />
-                      <span className="font-medium whitespace-nowrap">
-                        {stage.duration} {getTimeUnitLabel(stage.unit)}
-                      </span>
-                    </div>
                     {!isMerged && (
                       <Button 
                         onClick={(e) => {
                           e.stopPropagation()
                           duplicateStage(stage.id)
                         }} 
-                        variant="outline" 
+                        variant="ghost" 
                         size="icon"
-                        className="shrink-0 hidden sm:flex"
+                        className="shrink-0 h-9 w-9 hidden md:flex"
+                        title="复制"
                       >
-                        <Copy />
+                        <Copy size={16} />
                       </Button>
                     )}
                     <Button 
@@ -728,81 +720,74 @@ function App() {
                         e.stopPropagation()
                         deleteStage(stage.id)
                       }} 
-                      variant="destructive" 
+                      variant="ghost" 
                       size="icon" 
-                      className="shrink-0"
-                      title={isMerged ? '移除' : '删除阶段'}
+                      className="shrink-0 h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      title={isMerged ? '移除' : '删除'}
                     >
-                      <Trash />
+                      <Trash size={16} />
                     </Button>
                   </div>
+                  
                   {isMerged && (
-                    <div className="pl-6 sm:pl-11 space-y-2" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="secondary">
+                    <div className="pl-7 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <Badge variant="secondary" className="text-xs">
                           {isEmbedded ? '嵌入策略' : '合并阶段'}
                         </Badge>
-                        <StageViewDialog stage={stage}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="mr-1" size={16} />
-                            查看设置
-                          </Button>
-                        </StageViewDialog>
+                        <span className="text-muted-foreground">
+                          {stage.duration} {getTimeUnitLabel(stage.unit)}
+                        </span>
+                        {isEmbedded && stage.embeddedStrategyStages && (
+                          <span className="text-muted-foreground">
+                            · {stage.embeddedStrategyStages.length} 个子阶段
+                          </span>
+                        )}
                       </div>
-                      {isEmbedded && stage.embeddedStrategyStages && (
-                        <details className="text-xs">
-                          <summary className="cursor-pointer text-accent/80">查看子阶段详情 ({stage.embeddedStrategyStages.length}个)</summary>
-                          <div className="mt-2 pl-4 space-y-1">
-                            {stage.embeddedStrategyStages.map((subStage, idx) => (
-                              <div key={idx}>
-                                {subStage.name} - {subStage.duration} {getTimeUnitLabel(subStage.unit)}
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      )}
+                      <StageViewDialog stage={stage}>
+                        <Button variant="outline" size="sm" className="h-8 text-xs">
+                          <Eye size={14} className="mr-1.5" />
+                          查看详情
+                        </Button>
+                      </StageViewDialog>
                     </div>
                   )}
+                  
                   {!isMerged && (
-                    <div className="flex items-center gap-2 pl-6 sm:pl-11 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pl-7" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 flex-1">
                         <Input
                           type="number"
                           value={stage.duration}
                           onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
-                          className="w-20 sm:w-24"
+                          className="w-20 h-8 text-sm"
+                          placeholder="时长"
                         />
                         <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
-                          <SelectTrigger className="w-24 sm:w-32">
+                          <SelectTrigger className="w-24 h-8 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="nanoseconds">纳秒</SelectItem>
-                            <SelectItem value="microseconds">微秒</SelectItem>
-                            <SelectItem value="milliseconds">毫秒</SelectItem>
                             <SelectItem value="seconds">秒</SelectItem>
                             <SelectItem value="minutes">分钟</SelectItem>
                             <SelectItem value="hours">小时</SelectItem>
-                            <SelectItem value="days">天</SelectItem>
-                            <SelectItem value="months">月</SelectItem>
-                            <SelectItem value="years">年</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="flex gap-2">
                         <StageViewDialog stage={stage}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="mr-1 sm:mr-2" size={16} />
-                            <span className="hidden sm:inline">查看</span>
+                          <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
+                            <Eye size={14} className="mr-1.5" />
+                            查看
                           </Button>
                         </StageViewDialog>
                         <StageSettingsDialog
                           stage={stage}
                           onUpdate={(updates) => updateStage(stage.id, updates)}
                         >
-                          <Button variant="outline" size="sm">
-                            <GearSix className="mr-1 sm:mr-2" size={16} />
-                            <span className="hidden sm:inline">编辑设置</span>
+                          <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
+                            <GearSix size={14} className="mr-1.5" />
+                            设置
                           </Button>
                         </StageSettingsDialog>
                       </div>
@@ -812,16 +797,19 @@ function App() {
               )
             })}
             {stages.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">还没有阶段，点击上方按钮添加</p>
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">还没有阶段</p>
+                <p className="text-xs mt-1">点击"添加"按钮开始</p>
+              </div>
             )}
           </div>
         </Card>
 
-        <Card className="p-4 sm:p-6 space-y-4">
-          <h3 className="text-xl font-semibold">提醒设置</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-sm">阶段切换全屏提醒</label>
+        <Card className="p-4 md:p-5 space-y-3">
+          <h3 className="text-lg font-semibold">全局设置</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+              <label className="text-sm font-medium">阶段切换提醒</label>
               <Switch
                 checked={settings.showFullscreenAlert}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -834,8 +822,8 @@ function App() {
                 }))}
               />
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-sm">强制确认提醒</label>
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+              <label className="text-sm font-medium">强制确认</label>
               <Switch
                 checked={settings.forceAcknowledge}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -848,8 +836,8 @@ function App() {
                 }))}
               />
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-sm">启用震动</label>
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+              <label className="text-sm font-medium">启用震动</label>
               <Switch
                 checked={settings.enableVibration}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -862,8 +850,8 @@ function App() {
                 }))}
               />
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-sm">静音模式</label>
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+              <label className="text-sm font-medium">静音模式</label>
               <Switch
                 checked={settings.muteAudio}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -879,24 +867,24 @@ function App() {
           </div>
         </Card>
 
-        <div className="flex flex-wrap gap-3 justify-center">
+        <div className="flex flex-wrap gap-2 justify-center">
           {!timerState.isRunning ? (
-            <Button onClick={handleStart} size="lg" className="px-8 w-full sm:w-auto">
-              <Play className="mr-2" weight="fill" />
+            <Button onClick={handleStart} size="lg" className="px-12 h-12 text-base font-medium w-full sm:w-auto">
+              <Play size={20} className="mr-2" weight="fill" />
               开始
             </Button>
           ) : (
             <>
-              <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial">
-                <Pause className="mr-2" weight="fill" />
+              <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
+                <Pause size={20} className="mr-2" weight="fill" />
                 {timerState.isPaused ? '继续' : '暂停'}
               </Button>
-              <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial">
-                <SkipForward className="mr-2" weight="fill" />
+              <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
+                <SkipForward size={20} className="mr-2" weight="fill" />
                 跳过
               </Button>
-              <Button onClick={handleReset} size="lg" variant="destructive" className="flex-1 sm:flex-initial">
-                <ArrowCounterClockwise className="mr-2" />
+              <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
+                <ArrowCounterClockwise size={20} className="mr-2" />
                 重置
               </Button>
             </>
