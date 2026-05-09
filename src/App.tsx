@@ -522,7 +522,7 @@ function App() {
 
   const getLoopModeLabel = (mode: LoopMode): string => {
     switch (mode) {
-      case 'infinite': return '无限�����环'
+      case 'infinite': return '无限�������环'
       case 'fixed-count': return '固定次数循环'
       case 'time-limited': return '限定时长循环'
       default: return '无限循环'
@@ -697,7 +697,7 @@ function App() {
                           <div className="mt-2 pl-4 space-y-1">
                             {stage.embeddedStrategyStages.map((subStage, idx) => (
                               <div key={idx}>
-                                {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
+                                {subStage.name} - {subStage.duration} {subStage.unit}
                               </div>
                             ))}
                           </div>
