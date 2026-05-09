@@ -522,7 +522,7 @@ function App() {
 
   const getLoopModeLabel = (mode: LoopMode): string => {
     switch (mode) {
-      case 'infinite': return '无限���环'
+      case 'infinite': return '无限�����环'
       case 'fixed-count': return '固定次数循环'
       case 'time-limited': return '限定时长循环'
       default: return '无限循环'
@@ -687,8 +687,6 @@ function App() {
                     </Button>
                   </div>
                   {isMerged && (
-                    <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
                         {isEmbedded ? '嵌入策略' : '合并阶段'}
                       </Badge>
                       {isEmbedded && stage.embeddedStrategyStages && (
@@ -697,10 +695,10 @@ function App() {
                           <div className="mt-2 pl-4 space-y-1">
                             {stage.embeddedStrategyStages.map((subStage, idx) => (
                               <div key={idx}>
+                            {stage.embeddedStrategyStages.map((subStage, idx) => (
+                              </div>
                                 {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
                               </div>
-                            ))}
-                          </div>
                         </details>
                       )}
                     </div>
@@ -853,12 +851,12 @@ function App() {
               </p>
               {currentStage && (
                 <p className="text-muted-foreground">
-                  下一阶段: <span className="font-medium">{currentStage.name}</span>
+                  下一���段: <span className="font-medium">{currentStage.name}</span>
                 </p>
               )}
-              <Button onClick={() => setShowAlert(false)} className="w-full">
+                  ���一阶段: <span className="font-medium">{currentStage.name}</span>
                 继续
-              </Button>
+              )}
             </div>
           </div>
         </DialogContent>
