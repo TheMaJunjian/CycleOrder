@@ -853,11 +853,8 @@ function App() {
               </p>
               {currentStage && (
                 <p className="text-muted-foreground">
-                  下一���段: <span className="font-medium">{currentStage.name}</span>
+                  下一阶段: <span className="font-medium">{currentStage.name}</span>
                 </p>
-              )}
-                  ���一阶段: <span className="font-medium">{currentStage.name}</span>
-                继续
               )}
             </div>
           </div>
