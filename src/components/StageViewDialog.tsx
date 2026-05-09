@@ -1,11 +1,11 @@
 import { Stage } from '@/types'
-import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-  children: React.ReactNode
+import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
 
-  const runningSettings = stage.
-    wallpaperM
+interface StageViewDialogProps {
+  stage: Stage
   children: React.ReactNode
 }
 
@@ -14,256 +14,258 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
     randomSound: false,
     wallpaperMode: 'random' as const,
     enableVibration: true,
-   
+  }
 
+  const endSettings = stage.endSettings || {
+    randomSound: false,
+    wallpaperMode: 'random' as const,
+    enableVibration: true,
+  }
+
+  const getTimeUnitLabel = (unit: string): string => {
+    const labels: Record<string, string> = {
+      nanoseconds: '纳秒',
+      microseconds: '微秒',
+      milliseconds: '毫秒',
+      seconds: '秒',
+      minutes: '分钟',
+      hours: '小时',
+      days: '天',
+      months: '月',
+      years: '年',
+    }
     return labels[unit] || unit
+  }
 
+  return (
     <Dialog>
-      <DialogContent class
-   
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
+        <DialogHeader>
+          <DialogTitle className="text-xl sm:text-2xl">查看阶段 - {stage.name}</DialogTitle>
+        </DialogHeader>
 
-          <div className="flex items-center justify-be
-            <span className="text-sm">{stage
-          
-            <div classNam
-                {stage.is
+        <div className="space-y-4">
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <span className="text-sm font-medium">阶段名称</span>
+            <span className="text-sm text-muted-foreground">{stage.name}</span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <span className="text-sm font-medium">时长</span>
+            <span className="text-sm text-muted-foreground">
+              {stage.duration} {getTimeUnitLabel(stage.unit)}
+            </span>
+          </div>
+          {stage.isMerged && (
+            <div className="py-2">
+              <Badge variant="secondary">
+                {stage.isEmbeddedStrategy ? '嵌入策略' : '合并阶段'}
+              </Badge>
             </div>
-
-            <detai
-                
-              <div
-                 
-     
+          )}
+          {stage.isEmbeddedStrategy && stage.embeddedStrategyStages && (
+            <details className="text-sm">
+              <summary className="cursor-pointer font-medium mb-2">
+                查看子阶段详情 ({stage.embeddedStrategyStages.length}个)
+              </summary>
+              <div className="mt-2 pl-4 space-y-2 border-l-2 border-border">
+                {stage.embeddedStrategyStages.map((subStage, idx) => (
+                  <div key={idx} className="text-sm text-muted-foreground">
+                    {idx + 1}. {subStage.name} - {subStage.duration} {getTimeUnitLabel(subStage.unit)}
+                  </div>
+                ))}
               </div>
-   
+            </details>
+          )}
+        </div>
 
-          
-            
+        <Tabs defaultValue="running" className="w-full mt-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="running">运行时提示</TabsTrigger>
+            <TabsTrigger value="end">结束时提示</TabsTrigger>
+          </TabsList>
 
+          <TabsContent value="running" className="space-y-6 mt-6">
             <div className="space-y-4">
-                <Speak
+              <div className="flex items-center gap-3">
+                <SpeakerHigh className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">音效设置</h3>
               </div>
-              <div clas
-        
-                    {runningSetting
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">随机音效</span>
+                  <div className="flex items-center gap-2">
+                    {runningSettings.randomSound ? (
+                      <>
+                        <span className="text-sm text-muted-foreground">是</span>
                         <Check className="text-green-600" size={20} />
                       </>
-                      <>
-                
-          
-                </div>
-                {!runningSettings.randomSound && (
-                    <span className="text
-                      <span className="text-sm text-muted-fo
-                      
-                  
-            
-
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg fo
-              
-                <div className="flex items-center justify-betw
-                  <span 
-                  </span>
-                {runningSettings.wallpaperMode === 'fixed' && (
-                    <span className="text-sm">自定义壁纸</span>
-                      <span className="text-sm text-muted-foreground">已上传</span>
-                      <s
-                  <
-              </div>
-
-            
-              
-
-                <div className="flex items-center justif
-                  <div className="flex items-center gap-
-                      <>
-                        <span className="text-sm text-mu
-                    )
-
-                      </>
-                  </div>
-              </div>
-          </TabsContent>
-          <TabsContent value="end" className="space-y-6 mt-6">
-              <div c
-              
-              
-                <div className="flex items-center justify-between py-2 border-b border-border/50">
-                  <div className="flex items-center gap
-                      <>
-                        <span className="text-sm tex
-                    ) : 
-                        <X className="text-red-600" size={20} />
-                      </>
-                  </div>
-
-                  <div c
-                    {endSettings.soundFile ? (
                     ) : (
-                    )}
-                )}
-            </div>
-            <div class
-
-              </div>
-              <div className="space-y-3 pl-9">
-                  <span className="text-sm">壁纸模式</span>
-                    {endSettings.wallpaperMode ===
-                </div>
-                  <div cl
-                    {endSettings.wallpaper ? (
-                    ) 
-                    )}
-                )}
-            </div>
-            <div c
-
-              </div>
-              <div className="space-y-3 pl-9">
-                  <span className="text-sm">启用震动</span>
-                    {endSettings.enableVibration ? (
-                    
-              
                       <>
                         <span className="text-sm text-muted-foreground">否</span>
+                        <X className="text-red-600" size={20} />
+                      </>
                     )}
+                  </div>
                 </div>
+                {!runningSettings.randomSound && (
+                  <div className="flex items-center justify-between py-2 border-b border-border/50">
+                    <span className="text-sm">自定义音效</span>
+                    {runningSettings.soundFile ? (
+                      <span className="text-sm text-muted-foreground">已上传</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">未上传</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">壁纸设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">壁纸模式</span>
+                  <span className="text-sm text-muted-foreground">
+                    {runningSettings.wallpaperMode === 'random' ? '随机壁纸' : '固定壁纸'}
+                  </span>
+                </div>
+                {runningSettings.wallpaperMode === 'fixed' && (
+                  <div className="flex items-center justify-between py-2 border-b border-border/50">
+                    <span className="text-sm">自定义壁纸</span>
+                    {runningSettings.wallpaper ? (
+                      <span className="text-sm text-muted-foreground">已上传</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">未上传</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Vibrate className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">震动设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">启用震动</span>
+                  <div className="flex items-center gap-2">
+                    {runningSettings.enableVibration ? (
+                      <>
+                        <span className="text-sm text-muted-foreground">是</span>
+                        <Check className="text-green-600" size={20} />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm text-muted-foreground">否</span>
+                        <X className="text-red-600" size={20} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="end" className="space-y-6 mt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <SpeakerHigh className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">音效设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">随机音效</span>
+                  <div className="flex items-center gap-2">
+                    {endSettings.randomSound ? (
+                      <>
+                        <span className="text-sm text-muted-foreground">是</span>
+                        <Check className="text-green-600" size={20} />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm text-muted-foreground">否</span>
+                        <X className="text-red-600" size={20} />
+                      </>
+                    )}
+                  </div>
+                </div>
+                {!endSettings.randomSound && (
+                  <div className="flex items-center justify-between py-2 border-b border-border/50">
+                    <span className="text-sm">自定义音效</span>
+                    {endSettings.soundFile ? (
+                      <span className="text-sm text-muted-foreground">已上传</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">未上传</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Image className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">壁纸设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">壁纸模式</span>
+                  <span className="text-sm text-muted-foreground">
+                    {endSettings.wallpaperMode === 'random' ? '随机壁纸' : '固定壁纸'}
+                  </span>
+                </div>
+                {endSettings.wallpaperMode === 'fixed' && (
+                  <div className="flex items-center justify-between py-2 border-b border-border/50">
+                    <span className="text-sm">自定义壁纸</span>
+                    {endSettings.wallpaper ? (
+                      <span className="text-sm text-muted-foreground">已上传</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">未上传</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Vibrate className="text-primary" size={24} />
+                <h3 className="text-lg font-semibold">震动设置</h3>
+              </div>
+              
+              <div className="space-y-3 pl-9">
+                <div className="flex items-center justify-between py-2 border-b border-border/50">
+                  <span className="text-sm">启用震动</span>
+                  <div className="flex items-center gap-2">
+                    {endSettings.enableVibration ? (
+                      <>
+                        <span className="text-sm text-muted-foreground">是</span>
+                        <Check className="text-green-600" size={20} />
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm text-muted-foreground">否</span>
+                        <X className="text-red-600" size={20} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
+      </DialogContent>
     </Dialog>
+  )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
