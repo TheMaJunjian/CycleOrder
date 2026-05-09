@@ -46,10 +46,12 @@ function App() {
   const [showAlert, setShowAlert] = useState(false)
   const [completedStage, setCompletedStage] = useState<Stage | null>(null)
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
+  const [isPlayingAlert, setIsPlayingAlert] = useState(false)
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
   const customSoundRef = useRef<HTMLAudioElement | null>(null)
+  const alertSoundRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (!stages || !loop) return
@@ -104,8 +106,27 @@ function App() {
           if (!currentStage) return prev
 
           const stageDuration = convertToMilliseconds(currentStage.duration, currentStage.unit)
+          
+          const alertTime = currentStage.endSettings?.alertTime ?? 0
+          const alertTimeUnit = currentStage.endSettings?.alertTimeUnit ?? 'seconds'
+          const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
+          
+          if (alertTime !== 0 && !isPlayingAlert) {
+            if (alertTime > 0) {
+              const timeUntilEnd = stageDuration - newElapsed
+              if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
+                playAlertSound(currentStage)
+              }
+            } else if (alertTime < 0) {
+              const alertStartTime = stageDuration
+              if (newElapsed >= alertStartTime && prev.currentStageElapsed < alertStartTime) {
+                playAlertSound(currentStage)
+              }
+            }
+          }
 
           if (newElapsed >= stageDuration) {
+            stopAlertSound()
             handleStageComplete(currentStage)
             
             const nextStageIndex = prev.currentStageIndex[0] + 1
@@ -148,6 +169,11 @@ function App() {
               }
             }
             
+            const nextStage = stages[nextStageIndex]
+            if (nextStage && nextStage.endSettings?.alertTime && nextStage.endSettings.alertTime < 0) {
+              playAlertSound(nextStage)
+            }
+            
             return {
               ...prev,
               currentStageIndex: [nextStageIndex],
@@ -177,7 +203,7 @@ function App() {
       }
       stopAllEffects()
     }
-  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings, loop])
+  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings, loop, isPlayingAlert])
 
   const playStageRunningEffects = (stage: Stage) => {
     if (!stage.runningSettings) return
@@ -251,6 +277,45 @@ function App() {
       customSoundRef.current.pause()
       customSoundRef.current = null
     }
+    if (alertSoundRef.current) {
+      alertSoundRef.current.pause()
+      alertSoundRef.current = null
+    }
+  }
+
+  const playAlertSound = (stage: Stage) => {
+    if (!stage.endSettings || !stage.endSettings.alertTime || stage.endSettings.alertTime === 0) {
+      return
+    }
+
+    if (settings?.muteAudio) {
+      return
+    }
+
+    stopAlertSound()
+
+    if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
+      try {
+        const audio = new Audio(stage.endSettings.soundFile)
+        audio.loop = true
+        audio.volume = 0.5
+        audio.play().catch((e) => console.error('Failed to play alert sound', e))
+        alertSoundRef.current = audio
+        setIsPlayingAlert(true)
+      } catch (e) {
+        console.error('Failed to load alert sound', e)
+      }
+    } else {
+      playBeep()
+    }
+  }
+
+  const stopAlertSound = () => {
+    if (alertSoundRef.current) {
+      alertSoundRef.current.pause()
+      alertSoundRef.current = null
+    }
+    setIsPlayingAlert(false)
   }
 
   const handleStageComplete = (stage: Stage) => {
@@ -558,19 +623,19 @@ function App() {
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="text-center space-y-1 pb-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">CycleOrder</h1>
-          <p className="text-sm text-muted-foreground">Multi-Stage Loop Timer</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
+          <p className="text-sm text-muted-foreground">多阶段循环计时器 (CycleOrder)</p>
         </div>
 
         {timerState.isRunning && currentStage && (
           <Card className="p-6 md:p-8 text-center space-y-5 border-2">
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Current Stage</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">{currentStage.name}</h2>
             </div>
             <div className="space-y-2">
               <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
-              <p className="text-xs text-muted-foreground">Remaining Time</p>
+              <p className="text-xs text-muted-foreground">剩余时间</p>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
@@ -604,7 +669,7 @@ function App() {
 
         <Card className="p-4 md:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold">Stage List</h3>
+            <h3 className="text-lg font-semibold">阶段列表</h3>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {selectedStageIds.size > 0 && (
                 <>
@@ -615,7 +680,7 @@ function App() {
                     className="flex-1 sm:flex-initial"
                   >
                     <Unite size={16} className="mr-1.5" />
-                    Merge ({selectedStageIds.size})
+                    合并 ({selectedStageIds.size})
                   </Button>
                   <Button 
                     onClick={clearSelection} 
@@ -623,7 +688,7 @@ function App() {
                     variant="ghost"
                     className="flex-1 sm:flex-initial"
                   >
-                    Clear
+                    清除选择
                   </Button>
                 </>
               )}
@@ -636,18 +701,18 @@ function App() {
               >
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <StackSimple size={16} className="mr-1.5" />
-                  Strategies
+                  策略
                 </Button>
               </StrategyManagementDialog>
               <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat size={16} className="mr-1.5" />
-                  Loop
+                  循环
                 </Button>
               </LoopSettingsDialog>
               <Button onClick={addStage} size="sm" className="flex-1 sm:flex-initial">
                 <Plus size={16} className="mr-1.5" />
-                Add
+                添加
               </Button>
             </div>
           </div>
@@ -753,7 +818,7 @@ function App() {
                           value={stage.duration}
                           onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
                           className="w-20 h-8 text-sm"
-                          placeholder="Duration"
+                          placeholder="时长"
                           step="0.1"
                         />
                         <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
@@ -761,11 +826,11 @@ function App() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="milliseconds">ms</SelectItem>
-                            <SelectItem value="seconds">sec</SelectItem>
-                            <SelectItem value="minutes">min</SelectItem>
-                            <SelectItem value="hours">hr</SelectItem>
-                            <SelectItem value="days">day</SelectItem>
+                            <SelectItem value="milliseconds">毫秒</SelectItem>
+                            <SelectItem value="seconds">秒</SelectItem>
+                            <SelectItem value="minutes">分钟</SelectItem>
+                            <SelectItem value="hours">小时</SelectItem>
+                            <SelectItem value="days">天</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -773,7 +838,7 @@ function App() {
                         <StageViewDialog stage={stage}>
                           <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
                             <Eye size={14} className="mr-1.5" />
-                            View
+                            查看
                           </Button>
                         </StageViewDialog>
                         <StageSettingsDialog
@@ -782,7 +847,7 @@ function App() {
                         >
                           <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
                             <GearSix size={14} className="mr-1.5" />
-                            Settings
+                            设置
                           </Button>
                         </StageSettingsDialog>
                       </div>
@@ -793,18 +858,18 @@ function App() {
             })}
             {stages.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">No stages yet</p>
-                <p className="text-xs mt-1">Click "Add" to get started</p>
+                <p className="text-sm">暂无阶段</p>
+                <p className="text-xs mt-1">点击"添加"开始创建</p>
               </div>
             )}
           </div>
         </Card>
 
         <Card className="p-4 md:p-5 space-y-3">
-          <h3 className="text-lg font-semibold">Global Settings</h3>
+          <h3 className="text-lg font-semibold">全局设置</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">Stage Switch Alert</label>
+              <label className="text-sm font-medium">阶段切换提醒</label>
               <Switch
                 checked={settings.showFullscreenAlert}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -818,7 +883,7 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">Force Acknowledge</label>
+              <label className="text-sm font-medium">强制确认</label>
               <Switch
                 checked={settings.forceAcknowledge}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -832,7 +897,7 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">Enable Vibration</label>
+              <label className="text-sm font-medium">启用震动</label>
               <Switch
                 checked={settings.enableVibration}
                 onCheckedChange={(checked) => setSettings((s) => ({
@@ -846,7 +911,7 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">Mute Audio</label>
+              <label className="text-sm font-medium">静音</label>
               <Switch
                 checked={settings.muteAudio}
                 onCheckedChange={(checked) => setSettings((s) => ({
@@ -866,7 +931,7 @@ function App() {
           {!timerState.isRunning ? (
             <Button onClick={handleStart} size="lg" className="px-12 h-12 text-base font-medium w-full sm:w-auto">
               <Play size={20} className="mr-2" weight="fill" />
-              Start
+              开始
             </Button>
           ) : (
             <>
@@ -874,22 +939,22 @@ function App() {
                 {timerState.isPaused ? (
                   <>
                     <PlayCircle size={20} className="mr-2" weight="fill" />
-                    Continue
+                    继续
                   </>
                 ) : (
                   <>
                     <Pause size={20} className="mr-2" weight="fill" />
-                    Pause
+                    暂停
                   </>
                 )}
               </Button>
               <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
                 <SkipForward size={20} className="mr-2" weight="fill" />
-                Skip
+                跳过
               </Button>
               <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
                 <ArrowCounterClockwise size={20} className="mr-2" />
-                Reset
+                重置
               </Button>
             </>
           )}

@@ -10,6 +10,8 @@ export interface StageSettings {
   wallpaperMode: 'fixed' | 'random'
   vibrationPattern?: number[]
   enableVibration: boolean
+  alertTime?: number
+  alertTimeUnit?: TimeUnit
 }
 
 export interface Stage {
