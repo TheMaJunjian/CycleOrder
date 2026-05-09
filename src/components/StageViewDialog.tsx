@@ -1,24 +1,19 @@
 import { Stage } from '@/types'
-import { convertToMilliseconds } from '@/lib/timer-utils'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from 
 import { Badge } from '@/components/ui/badge'
-import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
-
+interface StageViewDialogProps {
+import { Badge } from '@/components/ui/badge'
+  const runningSettings = s
 interface StageViewDialogProps {
 
-  const runningSettings = s
- 
-
-  const endSettings = stage.endSettings || {
+  const runningSettings = s.endSettings || {
     wallpaperMode: 'random' as const,
-  }
-  const getTimeUnitLabel = (unit: str
+
       nanoseconds: '纳秒',
    
-
+  }
       days: '天',
-      years: '年',
+      nanoseconds: '纳秒',
     return labels[unit] || unit
 
    
@@ -27,11 +22,15 @@ interface StageViewDialogProps {
     const parts = []
     if (hours % 24 > 0) 
     if (seconds % 60 > 0)
+    const days = Math.floor(hours / 24)
+
+    if (hours % 24 > 0) 
+    if (seconds % 60 > 0)
     return parts.length >
 
-    <Dialog>
-      <DialogConte
-          <Dialo
+          <div cl
+     
+                <div className=
         
           <div cl
      
@@ -47,10 +46,6 @@ interface StageViewDialogProps {
 
                 {sta
                     <span>{idx + 1}. {su
-                      {subStage.duration} {getTimeUni
-                  </div>
-              </div>
-    
 
    
 
