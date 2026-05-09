@@ -172,10 +172,10 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                     <div className="p-3 bg-primary/5 rounded-md">
                       <div className="text-sm font-medium">提示时间</div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {endSettings.alertTime > 0 ? (
-                          <>阶段结束前 {endSettings.alertTime} {getTimeUnitLabel(endSettings.alertTimeUnit || 'seconds')} 开始提示</>
+                        {(endSettings.alertTiming ?? 'inside') === 'inside' ? (
+                          <>阶段内：结束前 {endSettings.alertTime} {getTimeUnitLabel(endSettings.alertTimeUnit || 'seconds')} 开始提示</>
                         ) : (
-                          <>占用下一阶段 {Math.abs(endSettings.alertTime)} {getTimeUnitLabel(endSettings.alertTimeUnit || 'seconds')} 播放提示</>
+                          <>阶段外：占用下一阶段 {endSettings.alertTime} {getTimeUnitLabel(endSettings.alertTimeUnit || 'seconds')} 播放提示</>
                         )}
                       </div>
                     </div>

@@ -111,7 +111,7 @@ function App() {
           const alertTime = currentStage.endSettings?.alertTime ?? 0
           const alertTimeUnit = currentStage.endSettings?.alertTimeUnit ?? 'seconds'
           const alertTiming = currentStage.endSettings?.alertTiming ?? 'inside'
-          const alertTimeMs = convertToMilliseconds(Math.abs(alertTime), alertTimeUnit)
+          const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
           
           if (alertTime !== 0 && !isPlayingAlert) {
             if (alertTiming === 'inside') {

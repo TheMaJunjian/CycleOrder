@@ -302,11 +302,10 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     value={Math.abs(endSettings.alertTime ?? 0)}
                     onChange={(e) => {
                       const value = parseFloat(e.target.value) || 0
-                      const timing = endSettings.alertTiming ?? 'inside'
                       onUpdate({
                         endSettings: {
                           ...endSettings,
-                          alertTime: timing === 'inside' ? value : -value,
+                          alertTime: value,
                         },
                       })
                     }}
