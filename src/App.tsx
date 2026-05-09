@@ -522,7 +522,7 @@ function App() {
 
   const getLoopModeLabel = (mode: LoopMode): string => {
     switch (mode) {
-      case 'infinite': return '无限循环'
+      case 'infinite': return '无限���环'
       case 'fixed-count': return '固定次数循环'
       case 'time-limited': return '限定时长循环'
       default: return '无限循环'
@@ -652,28 +652,25 @@ function App() {
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedStageIds.has(stage.id)}
                       onChange={() => toggleStageSelection(stage.id)}
                       className="w-4 h-4 shrink-0 cursor-pointer"
                       aria-label="选择阶段"
                     />
                     <span className="text-sm font-medium text-muted-foreground w-6 sm:w-8 text-center shrink-0">{index + 1}</span>
+                      aria-label="选择阶段"
+                    />
+                    <span className="text-sm font-medium text-muted-foreground w-6 sm:w-8 text-center shrink-0">{index + 1}</span>
                     <Input
                       value={stage.name}
-                      onChange={(e) => updateStage(stage.id, { name: e.target.value })}
-                      className="flex-1 min-w-0"
-                      placeholder="阶段名称"
                       disabled={isMerged}
                     />
                     {!isMerged && (
-                      <Button 
+                      disabled={isMerged}
                         onClick={() => duplicateStage(stage.id)} 
-                        variant="outline" 
-                        size="icon" 
+                    {!isMerged && (
+                      <Button 
                         className="shrink-0"
-                        title="复制阶段"
+                        variant="outline" 
                       >
                         <Copy />
                       </Button>
@@ -686,22 +683,19 @@ function App() {
                       title={isMerged ? '移除' : '删除阶段'}
                     >
                       <Trash />
-                    </Button>
+                      title={isMerged ? '移除' : '删除阶段'}
                   </div>
                   {isMerged && (
-                    <div className="pl-6 sm:pl-11 space-y-2">
+                    </Button>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
+                  {isMerged && (
                           {isEmbedded ? '嵌入策略' : '合并阶段'}
                         </Badge>
-                        <span>总时长: {formatTime(convertToMilliseconds(stage.duration, stage.unit))}</span>
-                      </div>
+                        <Badge variant="secondary" className="text-xs">n>
+                          {isEmbedded ? '嵌入策略' : '合并阶段'}
                       {isEmbedded && stage.embeddedStrategyStages && (
                         <details className="text-xs">
-                          <summary className="cursor-pointer text-accent hover:text-accent/80">查看子阶段详情 ({stage.embeddedStrategyStages.length}个)</summary>
-                          <div className="mt-2 space-y-1 pl-4 border-l-2 border-accent/30">
-                            {stage.embeddedStrategyStages.map((subStage, idx) => (
-                              <div key={idx} className="text-muted-foreground">
+                      </div>accent/80">查看子阶段详情 ({stage.embeddedStrategyStages.length}个)</summary>
                                 {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
                               </div>
                             ))}
@@ -714,14 +708,14 @@ function App() {
                     <div className="flex items-center gap-2 pl-6 sm:pl-11">
                       <Input
                         type="number"
-                        value={stage.duration}
-                        onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
-                        className="w-16 sm:w-24"
-                        step="0.1"
-                      />
+                    </div>
+                  )}
+                  {!isMerged && (
+                    <div className="flex items-center gap-2 pl-6 sm:pl-11">
+                      <Input
                       <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
                         <SelectTrigger className="flex-1 sm:flex-initial sm:w-32">
-                          <SelectValue />
+                        onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="nanoseconds">纳秒</SelectItem>
