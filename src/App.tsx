@@ -616,11 +616,6 @@ function App() {
     }
   }
 
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-    </div>
-  }
-
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-5">
@@ -632,20 +627,21 @@ function App() {
         {timerState.isRunning && currentStage && (
           <Card className="p-6 md:p-8 text-center space-y-5 border-2">
             {appState.currentStrategyName && (
+              <div className="space-y-1">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前策略</p>
                 <h3 className="text-lg font-semibold text-foreground">{appState.currentStrategyName}</h3>
               </div>
             )}
             <div className="space-y-1">
               <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">{currentStage.name}</h2>
-              <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
+            </div>
             <div className="space-y-2">
               <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
               <p className="text-xs text-muted-foreground">剩余时间</p>
             </div>
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
                 className="h-full bg-primary transition-all duration-100 rounded-full"
                 style={{
                   width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
