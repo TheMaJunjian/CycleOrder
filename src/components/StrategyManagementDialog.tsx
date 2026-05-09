@@ -269,7 +269,7 @@ export function StrategyManagementDialog({
                           size="sm"
                           className="flex-1"
                         >
-                          加载策略
+                          加载
                         </Button>
                       </div>
                     </div>

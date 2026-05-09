@@ -19,6 +19,7 @@ export interface Stage {
   unit: TimeUnit
   runningSettings: StageSettings
   endSettings: StageSettings
+  isMerged?: boolean
   isEmbeddedStrategy?: boolean
   embeddedStrategyId?: string
   embeddedStrategyStages?: Stage[]

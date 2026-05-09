@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, LockKey } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
@@ -464,6 +464,7 @@ function App() {
       endSettings: {
         ...sortedSelectedStages[sortedSelectedStages.length - 1].endSettings,
       },
+      isMerged: true,
     }
 
     const firstSelectedIndex = stages.indexOf(sortedSelectedStages[0])
@@ -503,6 +504,7 @@ function App() {
         endSettings: {
           ...strategyStages[strategyStages.length - 1].endSettings,
         },
+        isMerged: true,
         isEmbeddedStrategy: true,
         embeddedStrategyId: strategyId,
         embeddedStrategyStages: strategyStages,
@@ -636,12 +638,13 @@ function App() {
 
           <div className="space-y-3">
             {stages.map((stage, index) => {
+              const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
               return (
                 <div 
                   key={stage.id} 
                   className={`p-3 rounded-lg space-y-3 transition-colors ${
-                    isEmbedded 
+                    isMerged 
                       ? 'bg-accent/10 border-2 border-accent' 
                       : selectedStageIds.has(stage.id) 
                         ? 'bg-primary/10 border-2 border-primary' 
@@ -649,28 +652,22 @@ function App() {
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-3">
-                    {isEmbedded ? (
-                      <div className="w-4 h-4 shrink-0 flex items-center justify-center" title="嵌入策略，不可编辑">
-                        <LockKey className="text-accent" size={16} />
-                      </div>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        checked={selectedStageIds.has(stage.id)}
-                        onChange={() => toggleStageSelection(stage.id)}
-                        className="w-4 h-4 shrink-0 cursor-pointer"
-                        aria-label="选择阶段"
-                      />
-                    )}
+                    <input
+                      type="checkbox"
+                      checked={selectedStageIds.has(stage.id)}
+                      onChange={() => toggleStageSelection(stage.id)}
+                      className="w-4 h-4 shrink-0 cursor-pointer"
+                      aria-label="选择阶段"
+                    />
                     <span className="text-sm font-medium text-muted-foreground w-6 sm:w-8 text-center shrink-0">{index + 1}</span>
                     <Input
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       className="flex-1 min-w-0"
                       placeholder="阶段名称"
-                      disabled={isEmbedded}
+                      disabled={isMerged}
                     />
-                    {!isEmbedded && (
+                    {!isMerged && (
                       <Button 
                         onClick={() => duplicateStage(stage.id)} 
                         variant="outline" 
@@ -686,32 +683,34 @@ function App() {
                       variant="destructive" 
                       size="icon" 
                       className="shrink-0"
-                      title={isEmbedded ? '移除策略' : '删除阶段'}
+                      title={isMerged ? '移除' : '删除阶段'}
                     >
                       <Trash />
                     </Button>
                   </div>
-                  {isEmbedded && stage.embeddedStrategyStages && (
+                  {isMerged && (
                     <div className="pl-6 sm:pl-11 space-y-2">
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
-                          嵌入策略 - {stage.embeddedStrategyStages.length} 个子阶段
+                          {isEmbedded ? '嵌入策略' : '合并阶段'}
                         </Badge>
                         <span>总时长: {formatTime(convertToMilliseconds(stage.duration, stage.unit))}</span>
                       </div>
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-accent hover:text-accent/80">查看子阶段详情</summary>
-                        <div className="mt-2 space-y-1 pl-4 border-l-2 border-accent/30">
-                          {stage.embeddedStrategyStages.map((subStage, idx) => (
-                            <div key={idx} className="text-muted-foreground">
-                              {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
-                            </div>
-                          ))}
-                        </div>
-                      </details>
+                      {isEmbedded && stage.embeddedStrategyStages && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-accent hover:text-accent/80">查看子阶段详情 ({stage.embeddedStrategyStages.length}个)</summary>
+                          <div className="mt-2 space-y-1 pl-4 border-l-2 border-accent/30">
+                            {stage.embeddedStrategyStages.map((subStage, idx) => (
+                              <div key={idx} className="text-muted-foreground">
+                                {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </div>
                   )}
-                  {!isEmbedded && (
+                  {!isMerged && (
                     <div className="flex items-center gap-2 pl-6 sm:pl-11">
                       <Input
                         type="number"
