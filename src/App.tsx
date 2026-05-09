@@ -9,9 +9,10 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
+import { StageViewDialog } from '@/components/StageViewDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
 import { StrategyManagementDialog } from '@/components/StrategyManagementDialog'
 
@@ -660,6 +661,22 @@ function App() {
               const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
               const isSelected = selectedStageIds.has(stage.id)
+              
+              const getTimeUnitLabel = (unit: string): string => {
+                const labels: Record<string, string> = {
+                  nanoseconds: '纳秒',
+                  microseconds: '微秒',
+                  milliseconds: '毫秒',
+                  seconds: '秒',
+                  minutes: '分钟',
+                  hours: '小时',
+                  days: '天',
+                  months: '月',
+                  years: '年',
+                }
+                return labels[unit] || unit
+              }
+              
               return (
                 <div 
                   key={stage.id} 
@@ -685,8 +702,14 @@ function App() {
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
                       disabled={isMerged}
-                      className="flex-1"
+                      className="flex-1 min-w-0"
                     />
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <Clock size={16} className="hidden sm:inline" />
+                      <span className="font-medium whitespace-nowrap">
+                        {stage.duration} {getTimeUnitLabel(stage.unit)}
+                      </span>
+                    </div>
                     {!isMerged && (
                       <Button 
                         onClick={(e) => {
@@ -695,7 +718,7 @@ function App() {
                         }} 
                         variant="outline" 
                         size="icon"
-                        className="shrink-0"
+                        className="shrink-0 hidden sm:flex"
                       >
                         <Copy />
                       </Button>
@@ -715,16 +738,24 @@ function App() {
                   </div>
                   {isMerged && (
                     <div className="pl-6 sm:pl-11 space-y-2" onClick={(e) => e.stopPropagation()}>
-                      <Badge variant="secondary">
-                        {isEmbedded ? '嵌入策略' : '合并阶段'}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary">
+                          {isEmbedded ? '嵌入策略' : '合并阶段'}
+                        </Badge>
+                        <StageViewDialog stage={stage}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="mr-1" size={16} />
+                            查看设置
+                          </Button>
+                        </StageViewDialog>
+                      </div>
                       {isEmbedded && stage.embeddedStrategyStages && (
                         <details className="text-xs">
                           <summary className="cursor-pointer text-accent/80">查看子阶段详情 ({stage.embeddedStrategyStages.length}个)</summary>
                           <div className="mt-2 pl-4 space-y-1">
                             {stage.embeddedStrategyStages.map((subStage, idx) => (
                               <div key={idx}>
-                                {subStage.name} - {subStage.duration} {subStage.unit}
+                                {subStage.name} - {subStage.duration} {getTimeUnitLabel(subStage.unit)}
                               </div>
                             ))}
                           </div>
@@ -733,37 +764,48 @@ function App() {
                     </div>
                   )}
                   {!isMerged && (
-                    <div className="flex items-center gap-2 pl-6 sm:pl-11" onClick={(e) => e.stopPropagation()}>
-                      <Input
-                        type="number"
-                        value={stage.duration}
-                        onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
-                        className="flex-1 sm:flex-initial sm:w-24"
-                      />
-                      <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
-                        <SelectTrigger className="flex-1 sm:flex-initial sm:w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="nanoseconds">纳秒</SelectItem>
-                          <SelectItem value="microseconds">微秒</SelectItem>
-                          <SelectItem value="milliseconds">毫秒</SelectItem>
-                          <SelectItem value="seconds">秒</SelectItem>
-                          <SelectItem value="minutes">分钟</SelectItem>
-                          <SelectItem value="hours">小时</SelectItem>
-                          <SelectItem value="days">天</SelectItem>
-                          <SelectItem value="months">月</SelectItem>
-                          <SelectItem value="years">年</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <StageSettingsDialog
-                        stage={stage}
-                        onUpdate={(updates) => updateStage(stage.id, updates)}
-                      >
-                        <Button variant="outline" size="icon" className="shrink-0">
-                          <GearSix />
-                        </Button>
-                      </StageSettingsDialog>
+                    <div className="flex items-center gap-2 pl-6 sm:pl-11 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          type="number"
+                          value={stage.duration}
+                          onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
+                          className="w-20 sm:w-24"
+                        />
+                        <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
+                          <SelectTrigger className="w-24 sm:w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nanoseconds">纳秒</SelectItem>
+                            <SelectItem value="microseconds">微秒</SelectItem>
+                            <SelectItem value="milliseconds">毫秒</SelectItem>
+                            <SelectItem value="seconds">秒</SelectItem>
+                            <SelectItem value="minutes">分钟</SelectItem>
+                            <SelectItem value="hours">小时</SelectItem>
+                            <SelectItem value="days">天</SelectItem>
+                            <SelectItem value="months">月</SelectItem>
+                            <SelectItem value="years">年</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <StageViewDialog stage={stage}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="mr-1 sm:mr-2" size={16} />
+                            <span className="hidden sm:inline">查看</span>
+                          </Button>
+                        </StageViewDialog>
+                        <StageSettingsDialog
+                          stage={stage}
+                          onUpdate={(updates) => updateStage(stage.id, updates)}
+                        >
+                          <Button variant="outline" size="sm">
+                            <GearSix className="mr-1 sm:mr-2" size={16} />
+                            <span className="hidden sm:inline">编辑设置</span>
+                          </Button>
+                        </StageSettingsDialog>
+                      </div>
                     </div>
                   )}
                 </div>
