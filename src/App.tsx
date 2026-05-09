@@ -525,10 +525,10 @@ function App() {
     setTimerState({
       isRunning: true,
       isPaused: false,
-      case 'infinite': return '无限���������环'
+      currentStageIndex: [0],
       currentStageElapsed: 0,
       totalElapsed: 0,
-      default: return '无限循环'
+      currentLoopIteration: [0],
     })
     toast.success(`策略"${strategy.name}"已开始运行`)
   }
