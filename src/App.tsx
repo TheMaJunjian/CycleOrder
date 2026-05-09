@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, ArrowCounterClockwise, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { StageViewDialog } from '@/components/StageViewDialog'
@@ -558,19 +558,19 @@ function App() {
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="text-center space-y-1 pb-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
-          <p className="text-sm text-muted-foreground">多阶段循环计时器</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground">CycleOrder</h1>
+          <p className="text-sm text-muted-foreground">Multi-Stage Loop Timer</p>
         </div>
 
         {timerState.isRunning && currentStage && (
           <Card className="p-6 md:p-8 text-center space-y-5 border-2">
             <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Current Stage</p>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">{currentStage.name}</h2>
             </div>
             <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime)}</div>
-              <p className="text-xs text-muted-foreground">剩余时间</p>
+              <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
+              <p className="text-xs text-muted-foreground">Remaining Time</p>
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
@@ -604,7 +604,7 @@ function App() {
 
         <Card className="p-4 md:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold">阶段列表</h3>
+            <h3 className="text-lg font-semibold">Stage List</h3>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {selectedStageIds.size > 0 && (
                 <>
@@ -615,7 +615,7 @@ function App() {
                     className="flex-1 sm:flex-initial"
                   >
                     <Unite size={16} className="mr-1.5" />
-                    合并 ({selectedStageIds.size})
+                    Merge ({selectedStageIds.size})
                   </Button>
                   <Button 
                     onClick={clearSelection} 
@@ -623,7 +623,7 @@ function App() {
                     variant="ghost"
                     className="flex-1 sm:flex-initial"
                   >
-                    取消
+                    Clear
                   </Button>
                 </>
               )}
@@ -636,18 +636,18 @@ function App() {
               >
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <StackSimple size={16} className="mr-1.5" />
-                  策略
+                  Strategies
                 </Button>
               </StrategyManagementDialog>
               <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat size={16} className="mr-1.5" />
-                  循环
+                  Loop
                 </Button>
               </LoopSettingsDialog>
               <Button onClick={addStage} size="sm" className="flex-1 sm:flex-initial">
                 <Plus size={16} className="mr-1.5" />
-                添加
+                Add
               </Button>
             </div>
           </div>
@@ -684,22 +684,14 @@ function App() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => toggleStageSelection(stage.id, e as any)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 shrink-0 cursor-pointer accent-primary"
-                      aria-label="选择阶段"
-                    />
-                    <span className="text-xs font-medium text-muted-foreground w-5 text-center shrink-0">#{index + 1}</span>
+                    <span className="text-xs font-medium text-muted-foreground w-7 text-right shrink-0">{index + 1}.</span>
                     <Input
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
                       disabled={isMerged}
                       className="flex-1 min-w-0 h-9"
-                      placeholder="阶段名称"
+                      placeholder="Stage name"
                     />
                     {!isMerged && (
                       <Button 
@@ -761,16 +753,19 @@ function App() {
                           value={stage.duration}
                           onChange={(e) => updateStage(stage.id, { duration: parseFloat(e.target.value) || 0 })}
                           className="w-20 h-8 text-sm"
-                          placeholder="时长"
+                          placeholder="Duration"
+                          step="0.1"
                         />
                         <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
                           <SelectTrigger className="w-24 h-8 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="seconds">秒</SelectItem>
-                            <SelectItem value="minutes">分钟</SelectItem>
-                            <SelectItem value="hours">小时</SelectItem>
+                            <SelectItem value="milliseconds">ms</SelectItem>
+                            <SelectItem value="seconds">sec</SelectItem>
+                            <SelectItem value="minutes">min</SelectItem>
+                            <SelectItem value="hours">hr</SelectItem>
+                            <SelectItem value="days">day</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -778,7 +773,7 @@ function App() {
                         <StageViewDialog stage={stage}>
                           <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
                             <Eye size={14} className="mr-1.5" />
-                            查看
+                            View
                           </Button>
                         </StageViewDialog>
                         <StageSettingsDialog
@@ -787,7 +782,7 @@ function App() {
                         >
                           <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
                             <GearSix size={14} className="mr-1.5" />
-                            设置
+                            Settings
                           </Button>
                         </StageSettingsDialog>
                       </div>
@@ -798,18 +793,18 @@ function App() {
             })}
             {stages.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">还没有阶段</p>
-                <p className="text-xs mt-1">点击"添加"按钮开始</p>
+                <p className="text-sm">No stages yet</p>
+                <p className="text-xs mt-1">Click "Add" to get started</p>
               </div>
             )}
           </div>
         </Card>
 
         <Card className="p-4 md:p-5 space-y-3">
-          <h3 className="text-lg font-semibold">全局设置</h3>
+          <h3 className="text-lg font-semibold">Global Settings</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">阶段切换提醒</label>
+              <label className="text-sm font-medium">Stage Switch Alert</label>
               <Switch
                 checked={settings.showFullscreenAlert}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -823,7 +818,7 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">强制确认</label>
+              <label className="text-sm font-medium">Force Acknowledge</label>
               <Switch
                 checked={settings.forceAcknowledge}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
@@ -837,10 +832,10 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">启用震动</label>
+              <label className="text-sm font-medium">Enable Vibration</label>
               <Switch
                 checked={settings.enableVibration}
-                onCheckedChange={(checked) => setSettings((s) => ({ 
+                onCheckedChange={(checked) => setSettings((s) => ({
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
                   forceAcknowledge: s?.forceAcknowledge ?? false,
                   wallpaperMode: s?.wallpaperMode ?? 'random',
@@ -851,10 +846,10 @@ function App() {
               />
             </div>
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">静音模式</label>
+              <label className="text-sm font-medium">Mute Audio</label>
               <Switch
                 checked={settings.muteAudio}
-                onCheckedChange={(checked) => setSettings((s) => ({ 
+                onCheckedChange={(checked) => setSettings((s) => ({
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
                   forceAcknowledge: s?.forceAcknowledge ?? false,
                   wallpaperMode: s?.wallpaperMode ?? 'random',
@@ -871,21 +866,30 @@ function App() {
           {!timerState.isRunning ? (
             <Button onClick={handleStart} size="lg" className="px-12 h-12 text-base font-medium w-full sm:w-auto">
               <Play size={20} className="mr-2" weight="fill" />
-              开始
+              Start
             </Button>
           ) : (
             <>
               <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
-                <Pause size={20} className="mr-2" weight="fill" />
-                {timerState.isPaused ? '继续' : '暂停'}
+                {timerState.isPaused ? (
+                  <>
+                    <PlayCircle size={20} className="mr-2" weight="fill" />
+                    Continue
+                  </>
+                ) : (
+                  <>
+                    <Pause size={20} className="mr-2" weight="fill" />
+                    Pause
+                  </>
+                )}
               </Button>
               <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
                 <SkipForward size={20} className="mr-2" weight="fill" />
-                跳过
+                Skip
               </Button>
               <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
                 <ArrowCounterClockwise size={20} className="mr-2" />
-                重置
+                Reset
               </Button>
             </>
           )}
