@@ -687,6 +687,8 @@ function App() {
                     </Button>
                   </div>
                   {isMerged && (
+                    <div className="pl-6 sm:pl-11 space-y-2">
+                      <Badge variant="secondary">
                         {isEmbedded ? '嵌入策略' : '合并阶段'}
                       </Badge>
                       {isEmbedded && stage.embeddedStrategyStages && (
@@ -695,10 +697,10 @@ function App() {
                           <div className="mt-2 pl-4 space-y-1">
                             {stage.embeddedStrategyStages.map((subStage, idx) => (
                               <div key={idx}>
-                            {stage.embeddedStrategyStages.map((subStage, idx) => (
-                              </div>
                                 {idx + 1}. {subStage.name} ({subStage.duration}{subStage.unit === 'minutes' ? '分' : subStage.unit === 'seconds' ? '秒' : subStage.unit === 'hours' ? '时' : ''})
                               </div>
+                            ))}
+                          </div>
                         </details>
                       )}
                     </div>
