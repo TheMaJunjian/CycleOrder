@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus, CaretDown, CaretUp, StackMinus } from '@phosphor-icons/react'
+import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus, CaretDown, CaretUp, StackMinus, Play } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,7 @@ interface StrategyManagementDialogProps {
   currentLoop: Loop
   currentSettings: Settings
   onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
+  onRunStrategy: (strategy: Strategy) => void
   children: ReactNode
 }
 
@@ -25,6 +26,7 @@ export function StrategyManagementDialog({
   currentLoop,
   currentSettings,
   onLoadStrategy,
+  onRunStrategy,
   children,
 }: StrategyManagementDialogProps) {
   const [open, setOpen] = useState(false)
@@ -60,6 +62,11 @@ export function StrategyManagementDialog({
     setNewStrategyName('')
     setNewStrategyDescription('')
     toast.success(`策略"${newStrategy.name}"已保存`)
+  }
+
+  const handleRunStrategy = (strategy: Strategy) => {
+    onRunStrategy(strategy)
+    setOpen(false)
   }
 
   const handleLoadStrategy = (strategy: Strategy) => {
@@ -265,11 +272,20 @@ export function StrategyManagementDialog({
                         </Button>
                         <Button
                           onClick={() => handleLoadStrategy(strategy)}
-                          variant="default"
+                          variant="secondary"
                           size="sm"
                           className="flex-1"
                         >
                           加载
+                        </Button>
+                        <Button
+                          onClick={() => handleRunStrategy(strategy)}
+                          variant="default"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Play className="mr-2" weight="fill" />
+                          运行
                         </Button>
                       </div>
                     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useKV } from '@github/spark/hooks'
-import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode } from '@/types'
+import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, vibrateDevice, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -425,7 +425,10 @@ function App() {
     toast.success('阶段已复制')
   }
 
-  const toggleStageSelection = (id: string) => {
+  const toggleStageSelection = (id: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation()
+    }
     setSelectedStageIds((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(id)) {
@@ -438,8 +441,8 @@ function App() {
   }
 
   const mergeSelectedStages = () => {
-    if (!stages || selectedStageIds.size < 2) {
-      toast.error('请至少选择两个阶段进行合并')
+    if (!stages || selectedStageIds.size < 1) {
+      toast.error('请至少选择一个阶段进行合并')
       return
     }
 
@@ -513,6 +516,21 @@ function App() {
       setStages((current) => [...(current || []), embeddedStage])
       toast.success(`已嵌入策略"${strategyName}"`)
     }
+  }
+
+  const handleRunStrategy = (strategy: Strategy) => {
+    setStages(strategy.stages)
+    setLoop(strategy.loop)
+    setSettings(strategy.settings)
+    setTimerState({
+      isRunning: true,
+      isPaused: false,
+      currentStageIndex: [0],
+      currentStageElapsed: 0,
+      totalElapsed: 0,
+      currentLoopIteration: [0],
+    })
+    toast.success(`策略"${strategy.name}"已开始运行`)
   }
 
   const currentStage = stages ? stages[timerState.currentStageIndex[0]] : undefined
@@ -614,6 +632,7 @@ function App() {
                 currentLoop={loop}
                 currentSettings={settings}
                 onLoadStrategy={handleLoadStrategy}
+                onRunStrategy={handleRunStrategy}
               >
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <StackSimple className="mr-2" />
@@ -640,22 +659,23 @@ function App() {
             {stages.map((stage, index) => {
               const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
+              const isSelected = selectedStageIds.has(stage.id)
               return (
                 <div 
                   key={stage.id} 
-                  className={`p-3 rounded-lg space-y-3 transition-colors ${
-                    isMerged 
-                      ? 'bg-accent/10 border-2 border-accent' 
-                      : selectedStageIds.has(stage.id) 
-                        ? 'bg-primary/10 border-2 border-primary' 
-                        : 'bg-muted/50 border-2 border-transparent'
+                  onClick={() => toggleStageSelection(stage.id)}
+                  className={`p-3 rounded-lg space-y-3 transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-primary/10 border-2 border-primary' 
+                      : 'bg-muted/50 border-2 border-transparent hover:bg-muted'
                   }`}
                 >
                   <div className="flex items-center gap-2 sm:gap-3">
                     <input
                       type="checkbox"
-                      checked={selectedStageIds.has(stage.id)}
-                      onChange={() => toggleStageSelection(stage.id)}
+                      checked={isSelected}
+                      onChange={(e) => toggleStageSelection(stage.id, e as any)}
+                      onClick={(e) => e.stopPropagation()}
                       className="w-4 h-4 shrink-0 cursor-pointer"
                       aria-label="选择阶段"
                     />
@@ -663,12 +683,16 @@ function App() {
                     <Input
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
                       disabled={isMerged}
                       className="flex-1"
                     />
                     {!isMerged && (
                       <Button 
-                        onClick={() => duplicateStage(stage.id)} 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          duplicateStage(stage.id)
+                        }} 
                         variant="outline" 
                         size="icon"
                         className="shrink-0"
@@ -677,7 +701,10 @@ function App() {
                       </Button>
                     )}
                     <Button 
-                      onClick={() => deleteStage(stage.id)} 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteStage(stage.id)
+                      }} 
                       variant="destructive" 
                       size="icon" 
                       className="shrink-0"
@@ -687,7 +714,7 @@ function App() {
                     </Button>
                   </div>
                   {isMerged && (
-                    <div className="pl-6 sm:pl-11 space-y-2">
+                    <div className="pl-6 sm:pl-11 space-y-2" onClick={(e) => e.stopPropagation()}>
                       <Badge variant="secondary">
                         {isEmbedded ? '嵌入策略' : '合并阶段'}
                       </Badge>
@@ -706,7 +733,7 @@ function App() {
                     </div>
                   )}
                   {!isMerged && (
-                    <div className="flex items-center gap-2 pl-6 sm:pl-11">
+                    <div className="flex items-center gap-2 pl-6 sm:pl-11" onClick={(e) => e.stopPropagation()}>
                       <Input
                         type="number"
                         value={stage.duration}
