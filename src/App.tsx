@@ -128,7 +128,6 @@ function App() {
           }
 
           if (newElapsed >= stageDuration) {
-            stopAlertSound()
             handleStageComplete(currentStage)
             
             const nextStageIndex = prev.currentStageIndex[0] + 1
@@ -322,6 +321,7 @@ function App() {
 
   const handleStageComplete = (stage: Stage) => {
     stopAllEffects()
+    stopAlertSound()
 
     if (stage.endSettings?.enableVibration) {
       if (stage.endSettings.vibrationPattern) {
