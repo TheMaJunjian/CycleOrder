@@ -152,6 +152,7 @@ function App() {
               })
               
               if (!shouldContinueLoop()) {
+                stopAllEffects()
                 toast.success('循环已完成')
                 return {
                   ...prev,
@@ -172,6 +173,7 @@ function App() {
             
             const nextStage = stages[nextStageIndex]
             if (nextStage && nextStage.endSettings?.alertTime && nextStage.endSettings?.alertTiming === 'outside') {
+              stopAllEffects()
               playAlertSound(nextStage)
             }
             
@@ -209,6 +211,8 @@ function App() {
   const playStageRunningEffects = (stage: Stage) => {
     if (!stage.runningSettings) return
 
+    stopAlertSound()
+
     if (!settings?.muteAudio && stage.runningSettings.soundFile && !stage.runningSettings.randomSound) {
       playCustomSound(stage.runningSettings.soundFile)
     } else if (!settings?.muteAudio) {
@@ -231,7 +235,11 @@ function App() {
         customSoundRef.current = null
       }
 
-      const audio = new Audio(soundDataUrl)
+      const actualDataUrl = soundDataUrl.includes('|||') 
+        ? soundDataUrl.split('|||')[1] 
+        : soundDataUrl
+
+      const audio = new Audio(actualDataUrl)
       audio.loop = true
       audio.volume = 0.3
       audio.play().catch((e) => console.error('Failed to play custom sound', e))
@@ -293,11 +301,15 @@ function App() {
       return
     }
 
-    stopAlertSound()
+    stopAllEffects()
 
     if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
       try {
-        const audio = new Audio(stage.endSettings.soundFile)
+        const actualDataUrl = stage.endSettings.soundFile.includes('|||')
+          ? stage.endSettings.soundFile.split('|||')[1]
+          : stage.endSettings.soundFile
+
+        const audio = new Audio(actualDataUrl)
         audio.loop = true
         audio.volume = 0.5
         audio.play().catch((e) => console.error('Failed to play alert sound', e))
@@ -347,7 +359,11 @@ function App() {
 
   const playEndSound = (soundDataUrl: string) => {
     try {
-      const audio = new Audio(soundDataUrl)
+      const actualDataUrl = soundDataUrl.includes('|||')
+        ? soundDataUrl.split('|||')[1]
+        : soundDataUrl
+
+      const audio = new Audio(actualDataUrl)
       audio.volume = 0.5
       audio.play().catch((e) => console.error('Failed to play end sound', e))
     } catch (e) {
@@ -968,7 +984,13 @@ function App() {
           {completedStage && completedStage.endSettings?.wallpaper && (
             <div 
               className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
-              style={{ backgroundImage: `url(${completedStage.endSettings.wallpaper})` }}
+              style={{ 
+                backgroundImage: `url(${
+                  completedStage.endSettings.wallpaper.includes('|||')
+                    ? completedStage.endSettings.wallpaper.split('|||')[1]
+                    : completedStage.endSettings.wallpaper
+                })` 
+              }}
             />
           )}
           <div className="relative z-10">

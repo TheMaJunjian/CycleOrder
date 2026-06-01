@@ -44,6 +44,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
     const reader = new FileReader()
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
+      const fileNameData = `${file.name}|||${dataUrl}`
       
       const runningSettings = stage.runningSettings || {
         randomSound: false,
@@ -60,7 +61,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         onUpdate({
           runningSettings: {
             ...runningSettings,
-            soundFile: dataUrl,
+            soundFile: fileNameData,
           },
         })
         toast.success('运行音效已上传')
@@ -68,7 +69,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         onUpdate({
           endSettings: {
             ...endSettings,
-            soundFile: dataUrl,
+            soundFile: fileNameData,
           },
         })
         toast.success('结束音效已上传')
@@ -76,7 +77,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         onUpdate({
           runningSettings: {
             ...runningSettings,
-            wallpaper: dataUrl,
+            wallpaper: fileNameData,
           },
         })
         toast.success('运行壁纸已上传')
@@ -84,7 +85,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         onUpdate({
           endSettings: {
             ...endSettings,
-            wallpaper: dataUrl,
+            wallpaper: fileNameData,
           },
         })
         toast.success('结束壁纸已上传')
@@ -166,7 +167,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {runningSettings.soundFile && (
-                      <p className="text-sm text-muted-foreground">已上传音效文件</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {runningSettings.soundFile.includes('|||') 
+                          ? runningSettings.soundFile.split('|||')[0]
+                          : '已上传音效文件'}
+                      </p>
                     )}
                   </div>
                 )}
@@ -231,7 +236,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {runningSettings.wallpaper && (
-                      <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {runningSettings.wallpaper.includes('|||')
+                          ? runningSettings.wallpaper.split('|||')[0]
+                          : '已上传壁纸文件'}
+                      </p>
                     )}
                   </div>
                 )}
@@ -403,7 +412,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {endSettings.soundFile && (
-                      <p className="text-sm text-muted-foreground">已上传音效文件</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {endSettings.soundFile.includes('|||')
+                          ? endSettings.soundFile.split('|||')[0]
+                          : '已上传音效文件'}
+                      </p>
                     )}
                   </div>
                 )}
@@ -468,7 +481,11 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {endSettings.wallpaper && (
-                      <p className="text-sm text-muted-foreground">已上传壁纸文件</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {endSettings.wallpaper.includes('|||')
+                          ? endSettings.wallpaper.split('|||')[0]
+                          : '已上传壁纸文件'}
+                      </p>
                     )}
                   </div>
                 )}
