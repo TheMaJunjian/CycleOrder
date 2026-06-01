@@ -335,7 +335,9 @@ function App() {
     stopAllEffects()
     stopAlertSound()
 
-    if (stage.endSettings?.enableVibration) {
+    const alertTime = stage.endSettings?.alertTime ?? 0
+
+    if (stage.endSettings?.enableVibration && alertTime !== 0) {
       if (stage.endSettings.vibrationPattern) {
         vibrateDevice(stage.endSettings.vibrationPattern)
       } else {
@@ -343,7 +345,7 @@ function App() {
       }
     }
 
-    if (!settings?.muteAudio && stage.endSettings) {
+    if (!settings?.muteAudio && stage.endSettings && alertTime !== 0) {
       if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
         playEndSound(stage.endSettings.soundFile)
       } else {
@@ -351,7 +353,7 @@ function App() {
       }
     }
 
-    if (settings?.showFullscreenAlert) {
+    if (settings?.showFullscreenAlert && alertTime !== 0) {
       setCompletedStage(stage)
       setShowAlert(true)
     }
@@ -403,11 +405,18 @@ function App() {
   }
 
   const handlePause = () => {
+    const willPause = !timerState.isPaused
+    if (willPause) {
+      stopAllEffects()
+      stopAlertSound()
+    }
     setTimerState((prev) => ({ ...prev, isPaused: !prev.isPaused }))
   }
 
   const handleSkip = () => {
     if (!stages) return
+    stopAllEffects()
+    stopAlertSound()
     setTimerState((prev) => ({
       ...prev,
       currentStageIndex: [(prev.currentStageIndex[0] + 1) % stages.length],
@@ -416,6 +425,8 @@ function App() {
   }
 
   const handleReset = () => {
+    stopAllEffects()
+    stopAlertSound()
     setTimerState({
       isRunning: false,
       isPaused: false,

@@ -113,7 +113,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {!runningSettings.randomSound && runningSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
-                            已上传自定义音效
+                            文件: {runningSettings.soundFile.includes('|||') 
+                              ? runningSettings.soundFile.split('|||')[0] 
+                              : '已上传'}
                           </div>
                         )}
                       </div>
@@ -135,7 +137,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {runningSettings.wallpaperMode === 'fixed' && runningSettings.wallpaper && (
                           <div className="text-xs text-muted-foreground">
-                            已上传自定义壁纸
+                            文件: {runningSettings.wallpaper.includes('|||') 
+                              ? runningSettings.wallpaper.split('|||')[0] 
+                              : '已上传'}
                           </div>
                         )}
                       </div>
@@ -196,7 +200,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {!endSettings.randomSound && endSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
-                            已上传自定义音效
+                            文件: {endSettings.soundFile.includes('|||') 
+                              ? endSettings.soundFile.split('|||')[0] 
+                              : '已上传'}
                           </div>
                         )}
                       </div>
@@ -218,7 +224,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {endSettings.wallpaperMode === 'fixed' && endSettings.wallpaper && (
                           <div className="text-xs text-muted-foreground">
-                            已上传自定义壁纸
+                            文件: {endSettings.wallpaper.includes('|||') 
+                              ? endSettings.wallpaper.split('|||')[0] 
+                              : '已上传'}
                           </div>
                         )}
                       </div>
