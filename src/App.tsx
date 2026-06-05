@@ -409,6 +409,7 @@ function App() {
     if (willPause) {
       stopAllEffects()
       stopAlertSound()
+      setIsPlayingAlert(false)
     }
     setTimerState((prev) => ({ ...prev, isPaused: !prev.isPaused }))
   }
@@ -417,6 +418,7 @@ function App() {
     if (!stages) return
     stopAllEffects()
     stopAlertSound()
+    setIsPlayingAlert(false)
     setTimerState((prev) => ({
       ...prev,
       currentStageIndex: [(prev.currentStageIndex[0] + 1) % stages.length],
@@ -427,6 +429,7 @@ function App() {
   const handleReset = () => {
     stopAllEffects()
     stopAlertSound()
+    setIsPlayingAlert(false)
     setTimerState({
       isRunning: false,
       isPaused: false,
