@@ -47,12 +47,13 @@ function App() {
   const [showAlert, setShowAlert] = useState(false)
   const [completedStage, setCompletedStage] = useState<Stage | null>(null)
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
-  const [isPlayingAlert, setIsPlayingAlert] = useState(false)
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
   const customSoundRef = useRef<HTMLAudioElement | null>(null)
   const alertSoundRef = useRef<HTMLAudioElement | null>(null)
+  const isAlertPlayingRef = useRef(false)
+  const prevStageIndexRef = useRef<number>(-1)
 
   useEffect(() => {
     if (!stages || !loop) return
@@ -94,8 +95,10 @@ function App() {
   useEffect(() => {
     if (timerState.isRunning && !timerState.isPaused && stages && settings && loop) {
       const currentStage = stages[timerState.currentStageIndex[0]]
+      const stageChanged = prevStageIndexRef.current !== timerState.currentStageIndex[0]
+      prevStageIndexRef.current = timerState.currentStageIndex[0]
       
-      if (currentStage) {
+      if (currentStage && stageChanged) {
         playStageRunningEffects(currentStage)
       }
 
@@ -113,7 +116,7 @@ function App() {
           const alertTiming = currentStage.endSettings?.alertTiming ?? 'inside'
           const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
           
-          if (alertTime !== 0 && !isPlayingAlert) {
+          if (alertTime !== 0 && !isAlertPlayingRef.current) {
             if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
@@ -197,16 +200,19 @@ function App() {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
-      stopAllEffects()
+      if (!timerState.isRunning) {
+        stopAllEffects()
+        stopAlertSound()
+        prevStageIndexRef.current = -1
+      }
     }
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
-      stopAllEffects()
     }
-  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings, loop, isPlayingAlert])
+  }, [timerState.isRunning, timerState.isPaused, timerState.currentStageIndex, stages, settings, loop])
 
   const playStageRunningEffects = (stage: Stage) => {
     if (!stage.runningSettings) return
@@ -290,6 +296,7 @@ function App() {
       alertSoundRef.current.pause()
       alertSoundRef.current = null
     }
+    isAlertPlayingRef.current = false
   }
 
   const playAlertSound = (stage: Stage) => {
@@ -298,6 +305,10 @@ function App() {
     }
 
     if (settings?.muteAudio) {
+      return
+    }
+
+    if (isAlertPlayingRef.current) {
       return
     }
 
@@ -314,21 +325,23 @@ function App() {
         audio.volume = 0.5
         audio.play().catch((e) => console.error('Failed to play alert sound', e))
         alertSoundRef.current = audio
-        setIsPlayingAlert(true)
+        isAlertPlayingRef.current = true
       } catch (e) {
         console.error('Failed to load alert sound', e)
       }
     } else {
       playBeep()
+      isAlertPlayingRef.current = true
     }
   }
 
   const stopAlertSound = () => {
     if (alertSoundRef.current) {
       alertSoundRef.current.pause()
+      alertSoundRef.current.currentTime = 0
       alertSoundRef.current = null
     }
-    setIsPlayingAlert(false)
+    isAlertPlayingRef.current = false
   }
 
   const handleStageComplete = (stage: Stage) => {
@@ -407,9 +420,23 @@ function App() {
   const handlePause = () => {
     const willPause = !timerState.isPaused
     if (willPause) {
-      stopAllEffects()
-      stopAlertSound()
-      setIsPlayingAlert(false)
+      if (customSoundRef.current) {
+        customSoundRef.current.pause()
+      }
+      if (noiseSourceRef.current) {
+        noiseSourceRef.current.stop()
+        noiseSourceRef.current = null
+      }
+      if (alertSoundRef.current) {
+        alertSoundRef.current.pause()
+      }
+    } else {
+      if (customSoundRef.current) {
+        customSoundRef.current.play().catch(() => {})
+      }
+      if (isAlertPlayingRef.current && alertSoundRef.current) {
+        alertSoundRef.current.play().catch(() => {})
+      }
     }
     setTimerState((prev) => ({ ...prev, isPaused: !prev.isPaused }))
   }
@@ -418,7 +445,6 @@ function App() {
     if (!stages) return
     stopAllEffects()
     stopAlertSound()
-    setIsPlayingAlert(false)
     setTimerState((prev) => ({
       ...prev,
       currentStageIndex: [(prev.currentStageIndex[0] + 1) % stages.length],
@@ -429,7 +455,7 @@ function App() {
   const handleReset = () => {
     stopAllEffects()
     stopAlertSound()
-    setIsPlayingAlert(false)
+    prevStageIndexRef.current = -1
     setTimerState({
       isRunning: false,
       isPaused: false,
