@@ -677,7 +677,7 @@ function App() {
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="text-center space-y-1 pb-2">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
-          <p className="text-sm text-muted-foreground">多阶段循环计时器 (CycleOrder)</p>
+          <p className="text-sm text-muted-foreground">多计时器 (CycleOrder)</p>
         </div>
 
         {timerState.isRunning && currentStage && (
