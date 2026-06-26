@@ -13,9 +13,9 @@ import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils
 import { Badge } from '@/components/ui/badge'
 
 interface StrategyManagementDialogProps {
-  currentStages: Stage[]
-  currentLoop: Loop
-  currentSettings: Settings
+  currentStages: Stage[] | undefined
+  currentLoop: Loop | undefined
+  currentSettings: Settings | undefined
   onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
   onRunStrategy: (strategy: Strategy) => void
   children: ReactNode
@@ -49,9 +49,22 @@ export function StrategyManagementDialog({
       id: generateId(),
       name: newStrategyName.trim(),
       description: newStrategyDescription.trim(),
-      stages: currentStages,
-      loop: currentLoop,
-      settings: currentSettings,
+      stages: currentStages || [],
+      loop: currentLoop || {
+        id: generateId(),
+        name: '主循环',
+        stages: [],
+        loopMode: 'infinite',
+        currentIteration: 0,
+        totalElapsed: 0,
+      },
+      settings: currentSettings || {
+        showFullscreenAlert: true,
+        forceAcknowledge: false,
+        wallpaperMode: 'random',
+        enableVibration: true,
+        muteAudio: false,
+      },
       loadMode: 'expand',
       isCollapsed: false,
       createdAt: Date.now(),
