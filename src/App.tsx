@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useKV } from '@github/spark/hooks'
 import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, vibrateDevice, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
@@ -16,10 +15,11 @@ import { StageViewDialog } from '@/components/StageViewDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
 import { StrategyManagementDialog } from '@/components/StrategyManagementDialog'
 import { getAudioReferenceId, getLocalAudioBlob } from '@/lib/audio-storage'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 
 function App() {
-  const [stages, setStages] = useKV<Stage[]>('timer-stages', [])
-  const [loop, setLoop] = useKV<Loop>('timer-loop', {
+  const [stages, setStages] = useLocalStorage<Stage[]>('timer-stages', [])
+  const [loop, setLoop] = useLocalStorage<Loop>('timer-loop', {
     id: generateId(),
     name: '主循环',
     stages: [],
@@ -27,14 +27,14 @@ function App() {
     currentIteration: 0,
     totalElapsed: 0,
   })
-  const [settings, setSettings] = useKV<Settings>('timer-settings', {
+  const [settings, setSettings] = useLocalStorage<Settings>('timer-settings', {
     showFullscreenAlert: true,
     forceAcknowledge: false,
     wallpaperMode: 'random',
     enableVibration: true,
     muteAudio: false,
   })
-  const [appState, setAppState] = useKV<AppState>('app-state', {})
+  const [appState, setAppState] = useLocalStorage<AppState>('app-state', {})
   
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
@@ -57,6 +57,8 @@ function App() {
   const beepSourceRef = useRef<OscillatorNode | null>(null)
   const audioGenerationRef = useRef(0)
   const isAlertPlayingRef = useRef(false)
+  const isAlertVibrationPlayedRef = useRef(false)
+  const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<number>(-1)
 
   useEffect(() => {
@@ -103,8 +105,13 @@ function App() {
       prevStageIndexRef.current = timerState.currentStageIndex[0]
       
       if (currentStage && stageChanged) {
+        const preserveOutsideAlert = isOutsideAlertPlayingRef.current
         stopAllEffects()
-        playStageRunningEffects(currentStage)
+        if (preserveOutsideAlert) {
+          isOutsideAlertPlayingRef.current = false
+        } else {
+          playStageRunningEffects(currentStage)
+        }
       }
 
       intervalRef.current = window.setInterval(() => {
@@ -125,6 +132,10 @@ function App() {
             if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
+                if (currentStage.endSettings?.enableVibration && !isAlertVibrationPlayedRef.current) {
+                  vibrateDevice(currentStage.endSettings.vibrationPattern || [200, 100, 200, 100, 400])
+                  isAlertVibrationPlayedRef.current = true
+                }
                 playAlertSound(currentStage)
               }
             } else {
@@ -180,9 +191,13 @@ function App() {
             }
             
             const nextStage = stages[nextStageIndex]
-            if (nextStage && nextStage.endSettings?.alertTime && nextStage.endSettings?.alertTiming === 'outside') {
+            if (currentStage.endSettings?.alertTime && currentStage.endSettings.alertTiming === 'outside') {
+              if (currentStage.endSettings.enableVibration) {
+                vibrateDevice(currentStage.endSettings.vibrationPattern || [200, 100, 200, 100, 400])
+              }
+              isOutsideAlertPlayingRef.current = true
               stopAllEffects()
-              playAlertSound(nextStage)
+              playAlertSound(currentStage)
             }
             
             return {
@@ -231,11 +246,7 @@ function App() {
     }
 
     if (stage.runningSettings.enableVibration) {
-      if (stage.runningSettings.vibrationPattern) {
-        vibrateDevice(stage.runningSettings.vibrationPattern)
-      } else {
-        vibrateDevice([50, 2000])
-      }
+      vibrateDevice(stage.runningSettings.vibrationPattern || [50, 2000])
     }
   }
 
@@ -339,6 +350,7 @@ function App() {
       beepSourceRef.current = null
     }
     isAlertPlayingRef.current = false
+    isAlertVibrationPlayedRef.current = false
   }
 
   const playAlertSound = async (stage: Stage) => {
@@ -394,14 +406,6 @@ function App() {
     stopAlertSound()
 
     const alertTime = stage.endSettings?.alertTime ?? 0
-
-    if (stage.endSettings?.enableVibration && alertTime !== 0) {
-      if (stage.endSettings.vibrationPattern) {
-        vibrateDevice(stage.endSettings.vibrationPattern)
-      } else {
-        vibrateDevice([200, 100, 200, 100, 400])
-      }
-    }
 
     if (!settings?.muteAudio && stage.endSettings && alertTime !== 0) {
       if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
@@ -728,6 +732,9 @@ function App() {
   const remainingTime = currentStage
     ? convertToMilliseconds(currentStage.duration, currentStage.unit) - timerState.currentStageElapsed
     : 0
+  const runningWallpaper = currentStage?.runningSettings?.wallpaperMode === 'fixed'
+    ? currentStage.runningSettings.wallpaper?.split('|||').pop()
+    : undefined
 
   const getLoopModeLabel = (mode: LoopMode): string => {
     switch (mode) {
@@ -747,7 +754,12 @@ function App() {
         </div>
 
         {timerState.isRunning && currentStage && (
-          <Card className="p-6 md:p-8 text-center space-y-5 border-2">
+          <Card
+            className="p-6 md:p-8 text-center space-y-5 border-2 bg-cover bg-center"
+            style={runningWallpaper ? {
+              backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.78)), url(${runningWallpaper})`,
+            } : undefined}
+          >
             {appState?.currentStrategyName && (
               <div className="space-y-1">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前策略</p>
@@ -1014,6 +1026,9 @@ function App() {
 
         <Card className="p-4 md:p-5 space-y-3">
           <h3 className="text-lg font-semibold">全局设置</h3>
+          <p className="text-xs text-muted-foreground">
+            各阶段的震动请在阶段设置中单独开启；震动仅在支持 Vibration API 的移动浏览器中可用。
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
               <label className="text-sm font-medium">阶段切换提醒</label>
@@ -1039,20 +1054,6 @@ function App() {
                   wallpaperMode: s?.wallpaperMode ?? 'random',
                   selectedWallpaper: s?.selectedWallpaper,
                   enableVibration: s?.enableVibration ?? true,
-                  muteAudio: s?.muteAudio ?? false,
-                }))}
-              />
-            </div>
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">启用震动</label>
-              <Switch
-                checked={settings?.enableVibration ?? true}
-                onCheckedChange={(checked) => setSettings((s) => ({
-                  showFullscreenAlert: s?.showFullscreenAlert ?? true,
-                  forceAcknowledge: s?.forceAcknowledge ?? false,
-                  wallpaperMode: s?.wallpaperMode ?? 'random',
-                  selectedWallpaper: s?.selectedWallpaper,
-                  enableVibration: checked,
                   muteAudio: s?.muteAudio ?? false,
                 }))}
               />
@@ -1090,11 +1091,7 @@ function App() {
             <div 
               className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
               style={{ 
-                backgroundImage: `url(${
-                  completedStage.endSettings.wallpaper.includes('|||')
-                    ? completedStage.endSettings.wallpaper.split('|||')[1]
-                    : completedStage.endSettings.wallpaper
-                })` 
+                  backgroundImage: `url(${completedStage.endSettings.wallpaper.split('|||').pop()})`
               }}
             />
           )}

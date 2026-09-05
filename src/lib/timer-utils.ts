@@ -52,8 +52,10 @@ export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-export function vibrateDevice(pattern?: number[]) {
-  if ('vibrate' in navigator) {
-    navigator.vibrate(pattern || [200])
+export function vibrateDevice(pattern?: number[]): boolean {
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+    return false
   }
+
+  return navigator.vibrate(pattern || [200])
 }
