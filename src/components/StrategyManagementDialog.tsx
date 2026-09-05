@@ -1,5 +1,4 @@
-import { useState, ReactNode } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useEffect, useState, ReactNode } from 'react'
 import { Strategy, Stage, Loop, Settings, StrategyLoadMode } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -30,9 +29,24 @@ export function StrategyManagementDialog({
   children,
 }: StrategyManagementDialogProps) {
   const [open, setOpen] = useState(false)
-  const [strategies, setStrategies] = useKV<Strategy[]>('saved-strategies', [])
+  const [strategies, setStrategies] = useState<Strategy[]>(() => {
+    try {
+      const storedStrategies = localStorage.getItem('cycle-order-saved-strategies')
+      return storedStrategies ? JSON.parse(storedStrategies) as Strategy[] : []
+    } catch {
+      return []
+    }
+  })
   const [newStrategyName, setNewStrategyName] = useState('')
   const [newStrategyDescription, setNewStrategyDescription] = useState('')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('cycle-order-saved-strategies', JSON.stringify(strategies))
+    } catch {
+      toast.error('策略保存失败，请检查浏览器存储空间')
+    }
+  }, [strategies])
 
   const handleSaveCurrentStrategy = () => {
     if (!newStrategyName.trim()) {
@@ -71,7 +85,7 @@ export function StrategyManagementDialog({
       updatedAt: Date.now(),
     }
 
-    setStrategies((current) => [...(current || []), newStrategy])
+    setStrategies((current) => [...current, newStrategy])
     setNewStrategyName('')
     setNewStrategyDescription('')
     toast.success(`策略"${newStrategy.name}"已保存`)
@@ -89,13 +103,13 @@ export function StrategyManagementDialog({
   }
 
   const handleDeleteStrategy = (id: string) => {
-    setStrategies((current) => (current || []).filter((s) => s.id !== id))
+    setStrategies((current) => current.filter((s) => s.id !== id))
     toast.success('策略已删除')
   }
 
   const toggleStrategyLoadMode = (id: string) => {
     setStrategies((current) =>
-      (current || []).map((s) => 
+      current.map((s) => 
         s.id === id 
           ? { ...s, loadMode: s.loadMode === 'expand' ? 'embed' : 'expand' }
           : s
@@ -105,7 +119,7 @@ export function StrategyManagementDialog({
 
   const toggleStrategyCollapsed = (id: string) => {
     setStrategies((current) =>
-      (current || []).map((s) => 
+      current.map((s) => 
         s.id === id 
           ? { ...s, isCollapsed: !s.isCollapsed }
           : s

@@ -17,9 +17,13 @@ interface StageSettingsDialogProps {
   children: React.ReactNode
 }
 
+const NO_AUDIO_VALUE = '__no-audio__'
+
 export function StageSettingsDialog({ stage, onUpdate, children }: StageSettingsDialogProps) {
   const [open, setOpen] = useState(false)
   const [audioLibrary, setAudioLibrary] = useState<LocalAudioFile[]>([])
+  const [runningAudioSelectOpen, setRunningAudioSelectOpen] = useState(false)
+  const [endAudioSelectOpen, setEndAudioSelectOpen] = useState(false)
   const soundRunningRef = useRef<HTMLInputElement>(null)
   const soundEndRef = useRef<HTMLInputElement>(null)
   const wallpaperRunningRef = useRef<HTMLInputElement>(null)
@@ -42,10 +46,25 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
 
     listLocalAudio()
       .then(setAudioLibrary)
-      .catch(() => toast.error('无法读取本机音频库'))
+      .catch(() => toast.error('无法读取上传音频库'))
   }, [open])
 
   const updateSoundSelection = (type: 'sound-running' | 'sound-end', audioId: string) => {
+    if (audioId === NO_AUDIO_VALUE) {
+      if (type === 'sound-running') {
+        onUpdate({ runningSettings: { ...runningSettings, soundFile: undefined } })
+      } else {
+        onUpdate({ endSettings: { ...endSettings, soundFile: undefined } })
+      }
+      toast.success('已清除当前音效')
+      if (type === 'sound-running') {
+        setRunningAudioSelectOpen(false)
+      } else {
+        setEndAudioSelectOpen(false)
+      }
+      return
+    }
+
     const audio = audioLibrary.find((item) => item.id === audioId)
     if (!audio) return
 
@@ -64,7 +83,12 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         },
       })
     }
-    toast.success(`已选择本机音频：${audio.name}`)
+    if (type === 'sound-running') {
+      setRunningAudioSelectOpen(false)
+    } else {
+      setEndAudioSelectOpen(false)
+    }
+    toast.success(`已选择上传音频：${audio.name}`)
   }
 
   const handleFileUpload = (
@@ -116,23 +140,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
         enableVibration: true,
       }
 
-      if (type === 'sound-running') {
-        onUpdate({
-          runningSettings: {
-            ...runningSettings,
-            soundFile: fileNameData,
-          },
-        })
-        toast.success('运行音效已上传')
-      } else if (type === 'sound-end') {
-        onUpdate({
-          endSettings: {
-            ...endSettings,
-            soundFile: fileNameData,
-          },
-        })
-        toast.success('结束音效已上传')
-      } else if (type === 'wallpaper-running') {
+      if (type === 'wallpaper-running') {
         onUpdate({
           runningSettings: {
             ...runningSettings,
@@ -230,13 +238,16 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     </div>
                     {audioLibrary.length > 0 && (
                       <Select
-                        value={getAudioReferenceId(runningSettings.soundFile)}
+                        open={runningAudioSelectOpen}
+                        onOpenChange={setRunningAudioSelectOpen}
+                        value={getAudioReferenceId(runningSettings.soundFile) ?? NO_AUDIO_VALUE}
                         onValueChange={(value) => updateSoundSelection('sound-running', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="从本机音频库选择" />
+                          <SelectValue placeholder="从上传音频库选择" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value={NO_AUDIO_VALUE}>不使用自定义音效</SelectItem>
                           {audioLibrary.map((audio) => (
                             <SelectItem key={audio.id} value={audio.id}>
                               {audio.name}
@@ -490,13 +501,16 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     </div>
                     {audioLibrary.length > 0 && (
                       <Select
-                        value={getAudioReferenceId(endSettings.soundFile)}
+                        open={endAudioSelectOpen}
+                        onOpenChange={setEndAudioSelectOpen}
+                        value={getAudioReferenceId(endSettings.soundFile) ?? NO_AUDIO_VALUE}
                         onValueChange={(value) => updateSoundSelection('sound-end', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="从本机音频库选择" />
+                          <SelectValue placeholder="从上传音频库选择" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value={NO_AUDIO_VALUE}>不使用自定义音效</SelectItem>
                           {audioLibrary.map((audio) => (
                             <SelectItem key={audio.id} value={audio.id}>
                               {audio.name}
