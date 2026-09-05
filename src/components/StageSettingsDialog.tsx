@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Stage, TimeUnit, AlertTiming } from '@/types'
+import { createAudioReference, getAudioDisplayName, getAudioReferenceId, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ interface StageSettingsDialogProps {
 
 export function StageSettingsDialog({ stage, onUpdate, children }: StageSettingsDialogProps) {
   const [open, setOpen] = useState(false)
+  const [audioLibrary, setAudioLibrary] = useState<LocalAudioFile[]>([])
   const soundRunningRef = useRef<HTMLInputElement>(null)
   const soundEndRef = useRef<HTMLInputElement>(null)
   const wallpaperRunningRef = useRef<HTMLInputElement>(null)
@@ -35,11 +37,68 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
     enableVibration: true,
   }
 
+  useEffect(() => {
+    if (!open) return
+
+    listLocalAudio()
+      .then(setAudioLibrary)
+      .catch(() => toast.error('无法读取本机音频库'))
+  }, [open])
+
+  const updateSoundSelection = (type: 'sound-running' | 'sound-end', audioId: string) => {
+    const audio = audioLibrary.find((item) => item.id === audioId)
+    if (!audio) return
+
+    if (type === 'sound-running') {
+      onUpdate({
+        runningSettings: {
+          ...runningSettings,
+          soundFile: createAudioReference(audio),
+        },
+      })
+    } else {
+      onUpdate({
+        endSettings: {
+          ...endSettings,
+          soundFile: createAudioReference(audio),
+        },
+      })
+    }
+    toast.success(`已选择本机音频：${audio.name}`)
+  }
+
   const handleFileUpload = (
     file: File | undefined,
     type: 'sound-running' | 'sound-end' | 'wallpaper-running' | 'wallpaper-end'
   ) => {
     if (!file) return
+
+    if (type === 'sound-running' || type === 'sound-end') {
+      saveLocalAudio(file)
+        .then((audio) => {
+          setAudioLibrary((current) => [audio, ...current.filter((item) => item.id !== audio.id)])
+          const soundFile = createAudioReference(audio)
+
+          if (type === 'sound-running') {
+            onUpdate({
+              runningSettings: {
+                ...runningSettings,
+                soundFile,
+              },
+            })
+          } else {
+            onUpdate({
+              endSettings: {
+                ...endSettings,
+                soundFile,
+              },
+            })
+          }
+          toast.success('音频已保存到本机，并已应用到当前阶段')
+        })
+        .catch(() => toast.error('音频保存失败，请检查浏览器存储空间'))
+      return
+    }
 
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -100,6 +159,9 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">阶段设置 - {stage.name}</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            音频仅保存在本机浏览器，不会上传服务器；清除站点数据后需要重新上传，也不会跨设备同步。
+          </p>
         </DialogHeader>
         
         <Tabs defaultValue="running" className="w-full">
@@ -166,11 +228,26 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
+                    {audioLibrary.length > 0 && (
+                      <Select
+                        value={getAudioReferenceId(runningSettings.soundFile)}
+                        onValueChange={(value) => updateSoundSelection('sound-running', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="从本机音频库选择" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {audioLibrary.map((audio) => (
+                            <SelectItem key={audio.id} value={audio.id}>
+                              {audio.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {runningSettings.soundFile && (
                       <p className="text-sm text-muted-foreground truncate">
-                        {runningSettings.soundFile.includes('|||') 
-                          ? runningSettings.soundFile.split('|||')[0]
-                          : '已上传音效文件'}
+                        当前音频：{getAudioDisplayName(runningSettings.soundFile) || '已上传音效文件'}
                       </p>
                     )}
                   </div>
@@ -411,11 +488,26 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                       )}
                     </div>
+                    {audioLibrary.length > 0 && (
+                      <Select
+                        value={getAudioReferenceId(endSettings.soundFile)}
+                        onValueChange={(value) => updateSoundSelection('sound-end', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="从本机音频库选择" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {audioLibrary.map((audio) => (
+                            <SelectItem key={audio.id} value={audio.id}>
+                              {audio.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     {endSettings.soundFile && (
                       <p className="text-sm text-muted-foreground truncate">
-                        {endSettings.soundFile.includes('|||')
-                          ? endSettings.soundFile.split('|||')[0]
-                          : '已上传音效文件'}
+                        当前音频：{getAudioDisplayName(endSettings.soundFile) || '已上传音效文件'}
                       </p>
                     )}
                   </div>

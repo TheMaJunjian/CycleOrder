@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
+import { getAudioDisplayName } from '@/lib/audio-storage'
 
 interface StageViewDialogProps {
   stage: Stage
@@ -113,9 +114,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {!runningSettings.randomSound && runningSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
-                            文件: {runningSettings.soundFile.includes('|||') 
-                              ? runningSettings.soundFile.split('|||')[0] 
-                              : '已上传'}
+                              文件: {getAudioDisplayName(runningSettings.soundFile) || '已上传音效文件'}
                           </div>
                         )}
                       </div>
@@ -200,9 +199,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                         </div>
                         {!endSettings.randomSound && endSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
-                            文件: {endSettings.soundFile.includes('|||') 
-                              ? endSettings.soundFile.split('|||')[0] 
-                              : '已上传'}
+                              文件: {getAudioDisplayName(endSettings.soundFile) || '已上传音效文件'}
                           </div>
                         )}
                       </div>

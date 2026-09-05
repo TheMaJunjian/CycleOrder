@@ -15,6 +15,7 @@ import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { StageViewDialog } from '@/components/StageViewDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
 import { StrategyManagementDialog } from '@/components/StrategyManagementDialog'
+import { getAudioReferenceId, getLocalAudioBlob } from '@/lib/audio-storage'
 
 function App() {
   const [stages, setStages] = useKV<Stage[]>('timer-stages', [])
@@ -54,6 +55,7 @@ function App() {
   const alertSoundRef = useRef<HTMLAudioElement | null>(null)
   const endSoundRef = useRef<HTMLAudioElement | null>(null)
   const beepSourceRef = useRef<OscillatorNode | null>(null)
+  const audioGenerationRef = useRef(0)
   const isAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<number>(-1)
 
@@ -237,16 +239,38 @@ function App() {
     }
   }
 
-  const playCustomSound = (soundDataUrl: string) => {
+  const resolveAudioSource = async (soundReference: string): Promise<string> => {
+    const audioId = getAudioReferenceId(soundReference)
+    if (!audioId) {
+      return soundReference.includes('|||')
+        ? soundReference.split('|||')[1]
+        : soundReference
+    }
+
+    const blob = await getLocalAudioBlob(audioId)
+    return URL.createObjectURL(blob)
+  }
+
+  const revokeAudioSource = (audio: HTMLAudioElement | null) => {
+    if (audio?.src.startsWith('blob:')) {
+      URL.revokeObjectURL(audio.src)
+    }
+  }
+
+  const playCustomSound = async (soundReference: string) => {
+    const generation = audioGenerationRef.current
     try {
       if (customSoundRef.current) {
         customSoundRef.current.pause()
+        revokeAudioSource(customSoundRef.current)
         customSoundRef.current = null
       }
 
-      const actualDataUrl = soundDataUrl.includes('|||') 
-        ? soundDataUrl.split('|||')[1] 
-        : soundDataUrl
+      const actualDataUrl = await resolveAudioSource(soundReference)
+      if (generation !== audioGenerationRef.current) {
+        if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
+        return
+      }
 
       const audio = new Audio(actualDataUrl)
       audio.loop = true
@@ -287,21 +311,25 @@ function App() {
   }
 
   const stopAllEffects = () => {
+    audioGenerationRef.current += 1
     if (noiseSourceRef.current) {
       noiseSourceRef.current.stop()
       noiseSourceRef.current = null
     }
     if (customSoundRef.current) {
       customSoundRef.current.pause()
+      revokeAudioSource(customSoundRef.current)
       customSoundRef.current = null
     }
     if (alertSoundRef.current) {
       alertSoundRef.current.pause()
+      revokeAudioSource(alertSoundRef.current)
       alertSoundRef.current = null
     }
     if (endSoundRef.current) {
       endSoundRef.current.pause()
       endSoundRef.current.currentTime = 0
+      revokeAudioSource(endSoundRef.current)
       endSoundRef.current = null
     }
     if (beepSourceRef.current) {
@@ -313,7 +341,7 @@ function App() {
     isAlertPlayingRef.current = false
   }
 
-  const playAlertSound = (stage: Stage) => {
+  const playAlertSound = async (stage: Stage) => {
     if (!stage.endSettings || !stage.endSettings.alertTime || stage.endSettings.alertTime === 0) {
       return
     }
@@ -327,12 +355,15 @@ function App() {
     }
 
     stopAllEffects()
+    const generation = audioGenerationRef.current
 
     if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
       try {
-        const actualDataUrl = stage.endSettings.soundFile.includes('|||')
-          ? stage.endSettings.soundFile.split('|||')[1]
-          : stage.endSettings.soundFile
+        const actualDataUrl = await resolveAudioSource(stage.endSettings.soundFile)
+        if (generation !== audioGenerationRef.current) {
+          if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
+          return
+        }
 
         const audio = new Audio(actualDataUrl)
         audio.loop = true
@@ -386,11 +417,14 @@ function App() {
     }
   }
 
-  const playEndSound = (soundDataUrl: string) => {
+  const playEndSound = async (soundReference: string) => {
+    const generation = audioGenerationRef.current
     try {
-      const actualDataUrl = soundDataUrl.includes('|||')
-        ? soundDataUrl.split('|||')[1]
-        : soundDataUrl
+      const actualDataUrl = await resolveAudioSource(soundReference)
+      if (generation !== audioGenerationRef.current) {
+        if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
+        return
+      }
 
       const audio = new Audio(actualDataUrl)
       audio.loop = true
