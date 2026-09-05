@@ -101,6 +101,7 @@ function App() {
       prevStageIndexRef.current = timerState.currentStageIndex[0]
       
       if (currentStage && stageChanged) {
+        stopAllEffects()
         playStageRunningEffects(currentStage)
       }
 
@@ -392,6 +393,7 @@ function App() {
         : soundDataUrl
 
       const audio = new Audio(actualDataUrl)
+      audio.loop = true
       audio.volume = 0.5
       audio.play().catch((e) => console.error('Failed to play end sound', e))
       endSoundRef.current = audio
@@ -447,11 +449,25 @@ function App() {
     if (willPause) {
       stopAllEffects()
     } else {
-      if (customSoundRef.current) {
-        customSoundRef.current.play().catch(() => {})
-      }
-      if (isAlertPlayingRef.current && alertSoundRef.current) {
-        alertSoundRef.current.play().catch(() => {})
+      const stage = stages?.[timerState.currentStageIndex[0]]
+      if (stage) {
+        playStageRunningEffects(stage)
+
+        const alertTime = stage.endSettings?.alertTime ?? 0
+        const alertTimeMs = convertToMilliseconds(
+          alertTime,
+          stage.endSettings?.alertTimeUnit ?? 'seconds'
+        )
+        const timeUntilEnd = convertToMilliseconds(stage.duration, stage.unit) - timerState.currentStageElapsed
+
+        if (
+          alertTime !== 0 &&
+          stage.endSettings?.alertTiming === 'inside' &&
+          timeUntilEnd <= alertTimeMs &&
+          timeUntilEnd > 0
+        ) {
+          playAlertSound(stage)
+        }
       }
     }
     setTimerState((prev) => ({ ...prev, isPaused: !prev.isPaused }))
