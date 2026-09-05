@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stage, TimeUnit, AlertTiming } from '@/types'
-import { createAudioReference, getAudioDisplayName, getAudioReferenceId, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
+import { createAudioReference, getAudioDisplayName, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SpeakerHigh, Image, Vibrate, Upload, Clock } from '@phosphor-icons/react'
+import { SpeakerHigh, Image, Vibrate, Upload, Clock, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 interface StageSettingsDialogProps {
@@ -128,7 +128,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
       const fileNameData = `${file.name}|||${dataUrl}`
-      
+
       const runningSettings = stage.runningSettings || {
         randomSound: false,
         wallpaperMode: 'random' as const,
@@ -163,7 +163,6 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">阶段设置 - {stage.name}</DialogTitle>
@@ -171,20 +170,17 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
             音频仅保存在本机浏览器，不会上传服务器；清除站点数据后需要重新上传，也不会跨设备同步。
           </p>
         </DialogHeader>
-        
         <Tabs defaultValue="running" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="running">运行时提示</TabsTrigger>
             <TabsTrigger value="end">结束时提示</TabsTrigger>
           </TabsList>
-
           <TabsContent value="running" className="space-y-6 mt-6">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <SpeakerHigh className="text-primary" size={24} />
                 <h3 className="text-lg font-semibold">音效设置</h3>
               </div>
-              
               <div className="space-y-3 pl-9">
                 <div className="flex items-center justify-between">
                   <Label>随机音效</Label>
@@ -237,24 +233,20 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {audioLibrary.length > 0 && (
-                      <Select
-                        open={runningAudioSelectOpen}
-                        onOpenChange={setRunningAudioSelectOpen}
-                        value={getAudioReferenceId(runningSettings.soundFile) ?? NO_AUDIO_VALUE}
-                        onValueChange={(value) => updateSoundSelection('sound-running', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="从上传音频库选择" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_AUDIO_VALUE}>不使用自定义音效</SelectItem>
-                          {audioLibrary.map((audio) => (
-                            <SelectItem key={audio.id} value={audio.id}>
-                              {audio.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-1">
+                        <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => setRunningAudioSelectOpen((isOpen) => !isOpen)}>
+                          <span className="truncate">{getAudioDisplayName(runningSettings.soundFile) || '从上传音频库选择'}</span>
+                          {runningAudioSelectOpen ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                        </Button>
+                        {runningAudioSelectOpen && (
+                          <div className="rounded-md border bg-popover p-1 shadow-sm">
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', NO_AUDIO_VALUE)}>不使用自定义音效</button>
+                            {audioLibrary.map((audio) => (
+                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', audio.id)}>{audio.name}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                     {runningSettings.soundFile && (
                       <p className="text-sm text-muted-foreground truncate">
@@ -500,24 +492,20 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       )}
                     </div>
                     {audioLibrary.length > 0 && (
-                      <Select
-                        open={endAudioSelectOpen}
-                        onOpenChange={setEndAudioSelectOpen}
-                        value={getAudioReferenceId(endSettings.soundFile) ?? NO_AUDIO_VALUE}
-                        onValueChange={(value) => updateSoundSelection('sound-end', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="从上传音频库选择" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_AUDIO_VALUE}>不使用自定义音效</SelectItem>
-                          {audioLibrary.map((audio) => (
-                            <SelectItem key={audio.id} value={audio.id}>
-                              {audio.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-1">
+                        <Button type="button" variant="outline" className="w-full justify-between font-normal" onClick={() => setEndAudioSelectOpen((isOpen) => !isOpen)}>
+                          <span className="truncate">{getAudioDisplayName(endSettings.soundFile) || '从上传音频库选择'}</span>
+                          {endAudioSelectOpen ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                        </Button>
+                        {endAudioSelectOpen && (
+                          <div className="rounded-md border bg-popover p-1 shadow-sm">
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', NO_AUDIO_VALUE)}>不使用自定义音效</button>
+                            {audioLibrary.map((audio) => (
+                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', audio.id)}>{audio.name}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                     {endSettings.soundFile && (
                       <p className="text-sm text-muted-foreground truncate">
