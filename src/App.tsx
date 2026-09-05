@@ -659,10 +659,10 @@ function App() {
   }
 
   const handleRunStrategy = (strategy: Strategy) => {
-    setStages(strategy.stages)
-    setLoop(strategy.loop)
-    setSettings(strategy.settings)
-    setAppState({ currentStrategyName: strategy.name })
+    setStages(() => strategy.stages)
+    setLoop(() => strategy.loop)
+    setSettings(() => strategy.settings)
+    setAppState(() => ({ currentStrategyName: strategy.name }))
     setTimerState({
       isRunning: true,
       isPaused: false,
@@ -698,10 +698,10 @@ function App() {
 
         {timerState.isRunning && currentStage && (
           <Card className="p-6 md:p-8 text-center space-y-5 border-2">
-            {appState.currentStrategyName && (
+            {appState?.currentStrategyName && (
               <div className="space-y-1">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前策略</p>
-                <h3 className="text-lg font-semibold text-foreground">{appState.currentStrategyName}</h3>
+                <h3 className="text-lg font-semibold text-foreground">{appState?.currentStrategyName}</h3>
               </div>
             )}
             <div className="space-y-1">
@@ -722,20 +722,20 @@ function App() {
             </div>
             <div className="flex flex-wrap gap-2 justify-center items-center text-xs">
               <Badge variant="outline">
-                阶段 {timerState.currentStageIndex[0] + 1} / {stages.length}
+                阶段 {timerState.currentStageIndex[0] + 1} / {stages?.length || 0}
               </Badge>
-              {loop.loopMode === 'fixed-count' && loop.loopCount && (
+              {loop?.loopMode === 'fixed-count' && loop?.loopCount && (
                 <Badge variant="secondary">
-                  第 {(loop.currentIteration || 0) + 1} / {loop.loopCount} 次
+                  第 {(loop?.currentIteration || 0) + 1} / {loop?.loopCount} 次
                 </Badge>
               )}
-              {loop.loopMode === 'time-limited' && loop.loopDuration && loop.loopDurationUnit && (
+              {loop?.loopMode === 'time-limited' && loop?.loopDuration && loop?.loopDurationUnit && (
                 <Badge variant="secondary">
-                  {formatTime(loop.totalElapsed || 0)} / {loop.loopDuration} {loop.loopDurationUnit}
+                  {formatTime(loop?.totalElapsed || 0)} / {loop?.loopDuration} {loop?.loopDurationUnit}
                 </Badge>
               )}
-              {loop.loopMode === 'infinite' && (
-                <Badge variant="secondary">第 {(loop.currentIteration || 0) + 1} 次</Badge>
+              {loop?.loopMode === 'infinite' && (
+                <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
               )}
             </div>
           </Card>
@@ -778,7 +778,7 @@ function App() {
                   策略
                 </Button>
               </StrategyManagementDialog>
-              <LoopSettingsDialog loop={loop} onUpdate={updateLoop}>
+              <LoopSettingsDialog loop={loop!} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat size={16} className="mr-1.5" />
                   循环
@@ -792,7 +792,7 @@ function App() {
           </div>
 
           <div className="space-y-2">
-            {stages.map((stage, index) => {
+            {(stages || []).map((stage, index) => {
               const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
               const isSelected = selectedStageIds.has(stage.id)
@@ -930,7 +930,7 @@ function App() {
                 </div>
               )
             })}
-            {stages.length === 0 && (
+            {(!stages || stages.length === 0) && (
               <div className="text-center py-12 text-muted-foreground">
                 <p className="text-sm">暂无阶段</p>
                 <p className="text-xs mt-1">点击"添加"开始创建</p>
@@ -945,7 +945,7 @@ function App() {
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
               <label className="text-sm font-medium">阶段切换提醒</label>
               <Switch
-                checked={settings.showFullscreenAlert}
+                checked={settings?.showFullscreenAlert ?? true}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
                   showFullscreenAlert: checked,
                   forceAcknowledge: s?.forceAcknowledge ?? false,
@@ -959,7 +959,7 @@ function App() {
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
               <label className="text-sm font-medium">强制确认</label>
               <Switch
-                checked={settings.forceAcknowledge}
+                checked={settings?.forceAcknowledge ?? false}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
                   forceAcknowledge: checked,
@@ -973,7 +973,7 @@ function App() {
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
               <label className="text-sm font-medium">启用震动</label>
               <Switch
-                checked={settings.enableVibration}
+                checked={settings?.enableVibration ?? true}
                 onCheckedChange={(checked) => setSettings((s) => ({
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
                   forceAcknowledge: s?.forceAcknowledge ?? false,
@@ -987,7 +987,7 @@ function App() {
             <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
               <label className="text-sm font-medium">静音</label>
               <Switch
-                checked={settings.muteAudio}
+                checked={settings?.muteAudio ?? false}
                 onCheckedChange={(checked) => setSettings((s) => ({
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
                   forceAcknowledge: s?.forceAcknowledge ?? false,
