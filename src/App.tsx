@@ -693,7 +693,7 @@ function App() {
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="text-center space-y-1 pb-2">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
-          <p className="text-sm text-muted-foreground">多计时器 (CycleOrder)</p>
+          <p className="text-sm text-muted-foreground">循环次序 (CycleOrder)</p>
         </div>
 
         {timerState.isRunning && currentStage && (
@@ -737,6 +737,29 @@ function App() {
               {loop?.loopMode === 'infinite' && (
                 <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
               )}
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
+                {timerState.isPaused ? (
+                  <>
+                    <PlayCircle size={20} className="mr-2" weight="fill" />
+                    继续
+                  </>
+                ) : (
+                  <>
+                    <Pause size={20} className="mr-2" weight="fill" />
+                    暂停
+                  </>
+                )}
+              </Button>
+              <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
+                <SkipForward size={20} className="mr-2" weight="fill" />
+                跳过
+              </Button>
+              <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
+                <ArrowCounterClockwise size={20} className="mr-2" />
+                重置
+              </Button>
             </div>
           </Card>
         )}
@@ -1001,38 +1024,14 @@ function App() {
           </div>
         </Card>
 
-        <div className="flex flex-wrap gap-2 justify-center">
-          {!timerState.isRunning ? (
+        {!timerState.isRunning && (
+          <div className="flex flex-wrap gap-2 justify-center">
             <Button onClick={handleStart} size="lg" className="px-12 h-12 text-base font-medium w-full sm:w-auto">
               <Play size={20} className="mr-2" weight="fill" />
               开始
             </Button>
-          ) : (
-            <>
-              <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
-                {timerState.isPaused ? (
-                  <>
-                    <PlayCircle size={20} className="mr-2" weight="fill" />
-                    继续
-                  </>
-                ) : (
-                  <>
-                    <Pause size={20} className="mr-2" weight="fill" />
-                    暂停
-                  </>
-                )}
-              </Button>
-              <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
-                <SkipForward size={20} className="mr-2" weight="fill" />
-                跳过
-              </Button>
-              <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
-                <ArrowCounterClockwise size={20} className="mr-2" />
-                重置
-              </Button>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <Dialog open={showAlert} onOpenChange={setShowAlert}>
