@@ -52,6 +52,8 @@ function App() {
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
   const customSoundRef = useRef<HTMLAudioElement | null>(null)
   const alertSoundRef = useRef<HTMLAudioElement | null>(null)
+  const endSoundRef = useRef<HTMLAudioElement | null>(null)
+  const beepSourceRef = useRef<OscillatorNode | null>(null)
   const isAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<number>(-1)
 
@@ -296,6 +298,17 @@ function App() {
       alertSoundRef.current.pause()
       alertSoundRef.current = null
     }
+    if (endSoundRef.current) {
+      endSoundRef.current.pause()
+      endSoundRef.current.currentTime = 0
+      endSoundRef.current = null
+    }
+    if (beepSourceRef.current) {
+      try {
+        beepSourceRef.current.stop()
+      } catch {}
+      beepSourceRef.current = null
+    }
     isAlertPlayingRef.current = false
   }
 
@@ -381,6 +394,12 @@ function App() {
       const audio = new Audio(actualDataUrl)
       audio.volume = 0.5
       audio.play().catch((e) => console.error('Failed to play end sound', e))
+      endSoundRef.current = audio
+      audio.addEventListener('ended', () => {
+        if (endSoundRef.current === audio) {
+          endSoundRef.current = null
+        }
+      }, { once: true })
     } catch (e) {
       console.error('Failed to load end sound', e)
     }
@@ -403,6 +422,12 @@ function App() {
       gainNode.gain.value = 0.3
 
       oscillator.start()
+      beepSourceRef.current = oscillator
+      oscillator.addEventListener('ended', () => {
+        if (beepSourceRef.current === oscillator) {
+          beepSourceRef.current = null
+        }
+      }, { once: true })
       oscillator.stop(audioContext.currentTime + 0.3)
     } catch (e) {
       console.error('Failed to play beep', e)
@@ -420,16 +445,7 @@ function App() {
   const handlePause = () => {
     const willPause = !timerState.isPaused
     if (willPause) {
-      if (customSoundRef.current) {
-        customSoundRef.current.pause()
-      }
-      if (noiseSourceRef.current) {
-        noiseSourceRef.current.stop()
-        noiseSourceRef.current = null
-      }
-      if (alertSoundRef.current) {
-        alertSoundRef.current.pause()
-      }
+      stopAllEffects()
     } else {
       if (customSoundRef.current) {
         customSoundRef.current.play().catch(() => {})
