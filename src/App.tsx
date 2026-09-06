@@ -56,10 +56,28 @@ function App() {
   const endSoundRef = useRef<HTMLAudioElement | null>(null)
   const beepSourceRef = useRef<OscillatorNode | null>(null)
   const audioGenerationRef = useRef(0)
+  const endSoundGenerationRef = useRef(0)
   const isAlertPlayingRef = useRef(false)
   const isAlertVibrationPlayedRef = useRef(false)
   const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<number>(-1)
+
+  useEffect(() => {
+    const recoverAudio = () => {
+      void resumeAudioContext().catch(() => {})
+      retryActiveAudio()
+    }
+
+    window.addEventListener('focus', recoverAudio)
+    document.addEventListener('visibilitychange', recoverAudio)
+    const recoveryInterval = window.setInterval(recoverAudio, 1000)
+
+    return () => {
+      window.removeEventListener('focus', recoverAudio)
+      document.removeEventListener('visibilitychange', recoverAudio)
+      window.clearInterval(recoveryInterval)
+    }
+  }, [settings?.muteAudio])
 
   useEffect(() => {
     if (!stages || !loop) return
@@ -106,7 +124,7 @@ function App() {
       
       if (currentStage && stageChanged) {
         const preserveOutsideAlert = isOutsideAlertPlayingRef.current
-        stopAllEffects()
+        stopAllEffects(true)
         if (preserveOutsideAlert) {
           isOutsideAlertPlayingRef.current = false
         } else {
@@ -250,6 +268,22 @@ function App() {
     }
   }
 
+  const resumeAudioContext = async () => {
+    if (audioContextRef.current?.state === 'suspended') {
+      await audioContextRef.current.resume()
+    }
+  }
+
+  const retryActiveAudio = () => {
+    if (settings?.muteAudio) return
+
+    for (const audio of [customSoundRef.current, alertSoundRef.current, endSoundRef.current]) {
+      if (audio && audio.paused) {
+        void audio.play().catch(() => {})
+      }
+    }
+  }
+
   const resolveAudioSource = async (soundReference: string): Promise<string> => {
     const audioId = getAudioReferenceId(soundReference)
     if (!audioId) {
@@ -286,14 +320,14 @@ function App() {
       const audio = new Audio(actualDataUrl)
       audio.loop = true
       audio.volume = 0.3
-      audio.play().catch((e) => console.error('Failed to play custom sound', e))
       customSoundRef.current = audio
+      audio.play().catch((e) => console.error('Failed to play custom sound', e))
     } catch (e) {
       console.error('Failed to load custom sound', e)
     }
   }
 
-  const playBackgroundNoise = () => {
+  const playBackgroundNoise = async () => {
     if (!settings || settings.muteAudio) return
     
     try {
@@ -302,6 +336,7 @@ function App() {
       }
 
       const audioContext = audioContextRef.current
+      await resumeAudioContext()
       const bufferSize = audioContext.sampleRate * 2
       const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate)
       const data = buffer.getChannelData(0)
@@ -321,7 +356,7 @@ function App() {
     }
   }
 
-  const stopAllEffects = () => {
+  const stopAllEffects = (preserveEndSound = false) => {
     audioGenerationRef.current += 1
     if (noiseSourceRef.current) {
       noiseSourceRef.current.stop()
@@ -337,7 +372,10 @@ function App() {
       revokeAudioSource(alertSoundRef.current)
       alertSoundRef.current = null
     }
-    if (endSoundRef.current) {
+    if (!preserveEndSound) {
+      endSoundGenerationRef.current += 1
+    }
+    if (!preserveEndSound && endSoundRef.current) {
       endSoundRef.current.pause()
       endSoundRef.current.currentTime = 0
       revokeAudioSource(endSoundRef.current)
@@ -380,9 +418,9 @@ function App() {
         const audio = new Audio(actualDataUrl)
         audio.loop = true
         audio.volume = 0.5
-        audio.play().catch((e) => console.error('Failed to play alert sound', e))
         alertSoundRef.current = audio
         isAlertPlayingRef.current = true
+        audio.play().catch((e) => console.error('Failed to play alert sound', e))
       } catch (e) {
         console.error('Failed to load alert sound', e)
       }
@@ -422,10 +460,10 @@ function App() {
   }
 
   const playEndSound = async (soundReference: string) => {
-    const generation = audioGenerationRef.current
+    const generation = endSoundGenerationRef.current
     try {
       const actualDataUrl = await resolveAudioSource(soundReference)
-      if (generation !== audioGenerationRef.current) {
+      if (generation !== endSoundGenerationRef.current) {
         if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
         return
       }
@@ -433,8 +471,8 @@ function App() {
       const audio = new Audio(actualDataUrl)
       audio.loop = true
       audio.volume = 0.5
-      audio.play().catch((e) => console.error('Failed to play end sound', e))
       endSoundRef.current = audio
+      audio.play().catch((e) => console.error('Failed to play end sound', e))
       audio.addEventListener('ended', () => {
         if (endSoundRef.current === audio) {
           endSoundRef.current = null
@@ -445,11 +483,12 @@ function App() {
     }
   }
 
-  const playBeep = () => {
+  const playBeep = async () => {
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
       }
+      await resumeAudioContext()
       const audioContext = audioContextRef.current
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()

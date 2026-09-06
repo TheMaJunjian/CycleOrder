@@ -163,6 +163,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">阶段设置 - {stage.name}</DialogTitle>
