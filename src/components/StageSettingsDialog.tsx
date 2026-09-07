@@ -241,7 +241,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                         {runningAudioSelectOpen && (
                           <div className="rounded-md border bg-popover p-1 shadow-sm">
-                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', NO_AUDIO_VALUE)}>不使用自定义音效</button>
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', NO_AUDIO_VALUE)}>无音效</button>
                             {audioLibrary.map((audio) => (
                               <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', audio.id)}>{audio.name}</button>
                             ))}
@@ -500,7 +500,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                         {endAudioSelectOpen && (
                           <div className="rounded-md border bg-popover p-1 shadow-sm">
-                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', NO_AUDIO_VALUE)}>不使用自定义音效</button>
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', NO_AUDIO_VALUE)}>无音效</button>
                             {audioLibrary.map((audio) => (
                               <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', audio.id)}>{audio.name}</button>
                             ))}

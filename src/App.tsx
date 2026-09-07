@@ -213,9 +213,11 @@ function App() {
               if (currentStage.endSettings.enableVibration) {
                 vibrateDevice(currentStage.endSettings.vibrationPattern || [200, 100, 200, 100, 400])
               }
-              isOutsideAlertPlayingRef.current = true
-              stopAllEffects()
-              playAlertSound(currentStage)
+              if (currentStage.endSettings.soundFile || currentStage.endSettings.randomSound) {
+                isOutsideAlertPlayingRef.current = true
+                stopAllEffects()
+                playAlertSound(currentStage)
+              }
             }
             
             return {
@@ -259,7 +261,7 @@ function App() {
 
     if (!settings?.muteAudio && stage.runningSettings.soundFile && !stage.runningSettings.randomSound) {
       playCustomSound(stage.runningSettings.soundFile)
-    } else if (!settings?.muteAudio) {
+    } else if (!settings?.muteAudio && stage.runningSettings.randomSound) {
       playBackgroundNoise()
     }
 
@@ -424,7 +426,7 @@ function App() {
       } catch (e) {
         console.error('Failed to load alert sound', e)
       }
-    } else {
+    } else if (stage.endSettings.randomSound) {
       playBeep()
       isAlertPlayingRef.current = true
     }
@@ -448,7 +450,7 @@ function App() {
     if (!settings?.muteAudio && stage.endSettings && alertTime !== 0) {
       if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
         playEndSound(stage.endSettings.soundFile)
-      } else {
+      } else if (stage.endSettings.randomSound) {
         playBeep()
       }
     }
@@ -752,6 +754,9 @@ function App() {
   }
 
   const handleRunStrategy = (strategy: Strategy) => {
+    stopAllEffects()
+    stopAlertSound()
+    prevStageIndexRef.current = -1
     setStages(() => strategy.stages)
     setLoop(() => strategy.loop)
     setSettings(() => strategy.settings)
