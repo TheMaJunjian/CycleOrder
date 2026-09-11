@@ -1,15 +1,79 @@
-import { useEffect, useState, ReactNode } from 'react'
-import { Strategy, Stage, Loop, Settings, StrategyLoadMode } from '@/types'
+import { useEffect, useRef, useState, ReactNode } from 'react'
+import { Strategy, Stage, Loop, Settings, StrategyLoadMode, TimeUnit } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus, CaretDown, CaretUp, StackMinus, Play } from '@phosphor-icons/react'
+import { FloppyDisk, FolderOpen, Trash, StackSimple, ListPlus, CaretDown, CaretUp, StackMinus, Play, Copy, ClipboardText, UploadSimple, DownloadSimple } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { generateId, formatTime, convertToMilliseconds } from '@/lib/timer-utils'
 import { Badge } from '@/components/ui/badge'
+import { createMissingAudioReference, createAudioReference, getAudioDisplayName, listLocalAudio } from '@/lib/audio-storage'
+
+const getWallpaperName = (wallpaper: string): string => wallpaper.startsWith('missing-wallpaper://')
+  ? decodeURIComponent(wallpaper.slice('missing-wallpaper://'.length))
+  : wallpaper.split('|||')[0]
+
+const mapStrategyStages = (
+  stages: Stage[],
+  mapSound: (soundFile: string | undefined) => string | undefined,
+  mapWallpaper: (wallpaper: string | undefined) => string | undefined
+): Stage[] => stages.map((stage) => ({
+  ...stage,
+  runningSettings: {
+    ...stage.runningSettings,
+    soundFile: mapSound(stage.runningSettings?.soundFile),
+    wallpaper: mapWallpaper(stage.runningSettings?.wallpaper),
+  },
+  endSettings: {
+    ...stage.endSettings,
+    soundFile: mapSound(stage.endSettings?.soundFile),
+    wallpaper: mapWallpaper(stage.endSettings?.wallpaper),
+  },
+  embeddedStrategyStages: stage.embeddedStrategyStages
+    ? mapStrategyStages(stage.embeddedStrategyStages, mapSound, mapWallpaper)
+    : stage.embeddedStrategyStages,
+}))
+
+  const validTimeUnits = new Set<TimeUnit>([
+    'nanoseconds', 'microseconds', 'milliseconds', 'seconds', 'minutes',
+    'hours', 'days', 'months', 'years',
+  ])
+
+  const isValidStage = (value: unknown): value is Stage => {
+    if (!value || typeof value !== 'object') return false
+    const stage = value as Partial<Stage>
+    const duration = stage.duration
+    return typeof stage.id === 'string'
+      && typeof stage.name === 'string'
+      && typeof duration === 'number'
+      && Number.isFinite(duration)
+      && duration > 0
+      && typeof stage.unit === 'string'
+      && validTimeUnits.has(stage.unit)
+      && (!stage.embeddedStrategyStages || (
+        Array.isArray(stage.embeddedStrategyStages)
+        && stage.embeddedStrategyStages.every(isValidStage)
+      ))
+  }
+
+  const isValidStrategy = (value: unknown): value is Strategy => {
+    if (!value || typeof value !== 'object') return false
+    const strategy = value as Partial<Strategy>
+    const loop = strategy.loop
+    return typeof strategy.name === 'string'
+      && strategy.name.trim().length > 0
+      && Array.isArray(strategy.stages)
+      && strategy.stages.length > 0
+      && strategy.stages.every(isValidStage)
+      && !!loop
+      && typeof loop === 'object'
+      && (loop.loopMode === 'infinite' || loop.loopMode === 'fixed-count' || loop.loopMode === 'time-limited')
+      && (!loop.loopCount || (Number.isFinite(loop.loopCount) && loop.loopCount > 0))
+      && (!loop.loopDuration || (Number.isFinite(loop.loopDuration) && loop.loopDuration > 0))
+  }
 
 interface StrategyManagementDialogProps {
   currentStages: Stage[] | undefined
@@ -39,6 +103,11 @@ export function StrategyManagementDialog({
   })
   const [newStrategyName, setNewStrategyName] = useState('')
   const [newStrategyDescription, setNewStrategyDescription] = useState('')
+  const [selectedStrategyIds, setSelectedStrategyIds] = useState<Set<string>>(new Set())
+  const transferInputRef = useRef<HTMLInputElement>(null)
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferMode, setTransferMode] = useState<'import' | 'export'>('import')
+  const [transferText, setTransferText] = useState('')
 
   useEffect(() => {
     try {
@@ -104,7 +173,160 @@ export function StrategyManagementDialog({
 
   const handleDeleteStrategy = (id: string) => {
     setStrategies((current) => current.filter((s) => s.id !== id))
+    setSelectedStrategyIds((current) => {
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
     toast.success('策略已删除')
+  }
+
+  const toggleStrategySelection = (id: string) => {
+    setSelectedStrategyIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const getSelectedStrategiesExport = (): string | undefined => {
+    const selectedStrategies = strategies.filter((strategy) => selectedStrategyIds.has(strategy.id))
+    if (selectedStrategies.length === 0) {
+      toast.error('请先选择要导出的策略')
+      return undefined
+    }
+
+    const exportedStrategies = selectedStrategies.map((strategy) => {
+      const mapSound = (soundFile: string | undefined) => soundFile ? getAudioDisplayName(soundFile) : undefined
+      const mapWallpaper = (wallpaper: string | undefined) => wallpaper ? getWallpaperName(wallpaper) : undefined
+      return {
+        ...strategy,
+        stages: mapStrategyStages(strategy.stages, mapSound, mapWallpaper),
+        loop: {
+          ...strategy.loop,
+          stages: mapStrategyStages(strategy.loop.stages || strategy.stages, mapSound, mapWallpaper),
+        },
+      }
+    })
+    return JSON.stringify({ version: 1, strategies: exportedStrategies }, null, 2)
+  }
+
+  const openExportDialog = () => {
+    const exportedData = getSelectedStrategiesExport()
+    if (!exportedData) return
+    setTransferMode('export')
+    setTransferText(exportedData)
+    setTransferOpen(true)
+  }
+
+  const downloadTransferData = () => {
+    if (!transferText.trim()) {
+      toast.error('没有可下载的数据')
+      return
+    }
+    const blob = new Blob([transferText], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `cycle-order-strategies-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success('已下载策略数据')
+  }
+
+  const importStrategiesFromText = async (text: string) => {
+    try {
+      const parsed: unknown = JSON.parse(text)
+      const importedStrategies = Array.isArray(parsed)
+        ? parsed
+        : (parsed && typeof parsed === 'object' && 'strategies' in parsed && Array.isArray(parsed.strategies)
+          ? parsed.strategies
+          : [])
+      if (importedStrategies.length === 0) throw new Error('文件中没有策略')
+      const invalidStrategyCount = importedStrategies.filter((value) => !isValidStrategy(value)).length
+      if (invalidStrategyCount > 0) {
+        throw new Error(`文件中有 ${invalidStrategyCount} 个策略结构无效`)
+      }
+
+      const audioLibrary = await listLocalAudio()
+      const missingAudioNames = new Set<string>()
+      const restoreSound = (soundFile: string | undefined) => {
+        if (!soundFile) return undefined
+        const name = getAudioDisplayName(soundFile)
+        const localAudio = audioLibrary.find((audio) => audio.name === name)
+        if (localAudio) return createAudioReference(localAudio)
+        missingAudioNames.add(name)
+        return createMissingAudioReference(name)
+      }
+      const restoreWallpaper = (wallpaper: string | undefined) => wallpaper
+        ? `missing-wallpaper://${encodeURIComponent(wallpaper.split('|||')[0].replace('missing-wallpaper://', ''))}`
+        : undefined
+      const restoredStrategies = importedStrategies.map((value) => {
+        const strategy = value
+        return {
+          ...strategy,
+          id: generateId(),
+          stages: mapStrategyStages(strategy.stages || [], restoreSound, restoreWallpaper),
+          loop: {
+            ...strategy.loop,
+            stages: mapStrategyStages(strategy.loop?.stages || strategy.stages || [], restoreSound, restoreWallpaper),
+          },
+        }
+      })
+
+      setStrategies((current) => [...current, ...restoredStrategies])
+      if (missingAudioNames.size > 0) {
+        toast.warning(`已导入策略，但 ${missingAudioNames.size} 个音频文件未找到，将按无音效处理`)
+      } else {
+        toast.success(`已导入 ${restoredStrategies.length} 个策略`)
+      }
+    } catch (error) {
+      console.error('[strategy-import] Failed to import strategies', error)
+      toast.error('策略导入失败，请选择有效的策略 JSON 文件')
+    }
+  }
+
+  const handleImportStrategies = async (file: File | undefined) => {
+    if (!file) return
+    setTransferMode('import')
+    await importStrategiesFromText(await file.text())
+    setTransferOpen(false)
+  }
+
+  const openImportDialog = () => {
+    setTransferMode('import')
+    setTransferText('')
+    setTransferOpen(true)
+  }
+
+  const copyTransferData = async () => {
+    try {
+      await navigator.clipboard.writeText(transferText)
+      toast.success('数据已复制到剪贴板')
+    } catch {
+      toast.error('复制失败，请手动选择文本复制')
+    }
+  }
+
+  const pasteTransferData = async () => {
+    try {
+      setTransferText(await navigator.clipboard.readText())
+      toast.success('已从剪贴板粘贴数据')
+    } catch {
+      toast.error('粘贴失败，请手动粘贴到文本框')
+    }
+  }
+
+  const importTransferData = async () => {
+    if (!transferText.trim()) {
+      transferInputRef.current?.click()
+      return
+    }
+    await importStrategiesFromText(transferText)
+    setTransferOpen(false)
   }
 
   const toggleStrategyLoadMode = (id: string) => {
@@ -184,9 +406,19 @@ export function StrategyManagementDialog({
           </Card>
 
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
               <FolderOpen className="text-primary" size={20} />
               <h3 className="text-lg font-semibold">已保存的策略</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={openImportDialog}>
+                  导入策略
+                </Button>
+                <Button variant="outline" size="sm" onClick={openExportDialog} disabled={selectedStrategyIds.size === 0}>
+                  导出已选 ({selectedStrategyIds.size})
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -201,7 +433,15 @@ export function StrategyManagementDialog({
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-base sm:text-lg truncate">{strategy.name}</h4>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="checkbox"
+                              aria-label={`选择策略 ${strategy.name}`}
+                              checked={selectedStrategyIds.has(strategy.id)}
+                              onChange={() => toggleStrategySelection(strategy.id)}
+                            />
+                            <h4 className="font-semibold text-base sm:text-lg truncate">{strategy.name}</h4>
+                          </div>
                           {strategy.description && (
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{strategy.description}</p>
                           )}
@@ -322,6 +562,68 @@ export function StrategyManagementDialog({
             </div>
           </div>
         </div>
+
+        <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+          <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{transferMode === 'export' ? '导出策略数据' : '导入策略数据'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 min-h-0 flex flex-1 flex-col">
+              <Textarea
+                value={transferText}
+                onChange={(event) => setTransferText(event.target.value)}
+                placeholder="在这里粘贴策略 JSON 数据"
+                className="h-[50vh] min-h-[180px] max-h-[55vh] resize-none overflow-y-auto font-mono text-xs"
+                aria-label="策略 JSON 数据"
+              />
+              <div className="flex w-full items-center justify-end gap-2 border-t pt-3">
+                {transferMode === 'import' && (
+                  <>
+                    <input
+                      ref={transferInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) void handleImportStrategies(file)
+                        event.target.value = ''
+                      }}
+                    />
+                    <Button type="button" variant="outline" onClick={() => void pasteTransferData()}>
+                      <ClipboardText className="mr-2" />
+                      粘贴
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => void importTransferData()}>
+                      <UploadSimple className="mr-2" />
+                      {transferText.trim() ? '导入数据' : '选择文件并导入'}
+                    </Button>
+                  </>
+                )}
+                {transferMode === 'export' && (
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => void copyTransferData()}>
+                      <Copy className="mr-2" />
+                      复制
+                    </Button>
+                    <Button type="button" variant="outline" onClick={downloadTransferData}>
+                      <DownloadSimple className="mr-2" />
+                      下载文件
+                    </Button>
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="hover:-translate-y-0.5 hover:bg-muted active:translate-y-0 active:scale-95 focus-visible:ring-2"
+                  onClick={() => setTransferOpen(false)}
+                >
+                  关闭
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   )

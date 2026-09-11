@@ -65,6 +65,7 @@ export interface TimerState {
   currentStageElapsed: number
   totalElapsed: number
   currentLoopIteration: number[]
+  lastUpdatedAt?: number
 }
 
 export type StrategyLoadMode = 'expand' | 'embed'

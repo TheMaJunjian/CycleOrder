@@ -2,6 +2,7 @@ import { Stage } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
 import { getAudioDisplayName } from '@/lib/audio-storage'
 
@@ -80,11 +81,20 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
               <div className="space-y-2">
                 {stage.embeddedStrategyStages.map((subStage, index) => (
                   <div key={subStage.id} className="p-3 bg-muted/20 rounded-md text-sm">
-                    <div className="font-medium">
-                      {index + 1}. {subStage.name}
-                    </div>
-                    <div className="text-muted-foreground text-xs mt-1">
-                      {subStage.duration} {getTimeUnitLabel(subStage.unit)}
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">
+                          {index + 1}. {subStage.name}
+                        </div>
+                        <div className="text-muted-foreground text-xs mt-1">
+                          {subStage.duration} {getTimeUnitLabel(subStage.unit)}
+                        </div>
+                      </div>
+                      <StageViewDialog stage={subStage}>
+                        <Button type="button" variant="outline" size="sm" className="shrink-0 text-xs">
+                          查看提示
+                        </Button>
+                      </StageViewDialog>
                     </div>
                   </div>
                 ))}
@@ -92,7 +102,8 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
             </div>
           )}
 
-          <Accordion type="single" collapsible className="w-full">
+          {!stage.isEmbeddedStrategy && (
+            <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="running">
               <AccordionTrigger className="text-base font-semibold">
                 运行时提示设置
@@ -249,7 +260,8 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                 </div>
               </AccordionContent>
             </AccordionItem>
-          </Accordion>
+            </Accordion>
+          )}
         </div>
       </DialogContent>
     </Dialog>

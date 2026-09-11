@@ -1,6 +1,8 @@
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
 import { ComponentProps } from "react"
 
+import { cn } from "@/lib/utils"
+
 function Collapsible({
   ...props
 }: ComponentProps<typeof CollapsiblePrimitive.Root>) {
@@ -8,11 +10,13 @@ function Collapsible({
 }
 
 function CollapsibleTrigger({
+  className,
   ...props
 }: ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) {
   return (
     <CollapsiblePrimitive.CollapsibleTrigger
       data-slot="collapsible-trigger"
+      className={cn("transition-colors hover:bg-accent/50 active:bg-accent/80 active:scale-[0.995]", className)}
       {...props}
     />
   )

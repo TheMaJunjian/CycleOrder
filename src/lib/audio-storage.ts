@@ -14,6 +14,7 @@ const DATABASE_NAME = 'cycle-order-local-audio'
 const DATABASE_VERSION = 1
 const STORE_NAME = 'audio-files'
 const AUDIO_REFERENCE_PREFIX = 'local-audio://'
+const MISSING_AUDIO_REFERENCE_PREFIX = 'missing-audio://'
 
 const openDatabase = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -83,7 +84,16 @@ export const getAudioReferenceId = (value?: string): string | undefined => {
   return value.slice(AUDIO_REFERENCE_PREFIX.length).split('|||')[0]
 }
 
+export const createMissingAudioReference = (name: string): string =>
+  `${MISSING_AUDIO_REFERENCE_PREFIX}${encodeURIComponent(name)}`
+
+export const isMissingAudioReference = (value?: string): boolean =>
+  value?.startsWith(MISSING_AUDIO_REFERENCE_PREFIX) ?? false
+
 export const getAudioDisplayName = (value?: string): string => {
   if (!value) return ''
+  if (isMissingAudioReference(value)) {
+    return decodeURIComponent(value.slice(MISSING_AUDIO_REFERENCE_PREFIX.length))
+  }
   return value.includes('|||') ? value.split('|||')[value.startsWith(AUDIO_REFERENCE_PREFIX) ? 1 : 0] : value
 }

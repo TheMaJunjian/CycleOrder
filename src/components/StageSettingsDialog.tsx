@@ -241,9 +241,9 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                         {runningAudioSelectOpen && (
                           <div className="rounded-md border bg-popover p-1 shadow-sm">
-                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', NO_AUDIO_VALUE)}>无音效</button>
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent active:bg-accent/80 active:scale-[0.99]" onClick={() => updateSoundSelection('sound-running', NO_AUDIO_VALUE)}>无音效</button>
                             {audioLibrary.map((audio) => (
-                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-running', audio.id)}>{audio.name}</button>
+                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent active:bg-accent/80 active:scale-[0.99]" onClick={() => updateSoundSelection('sound-running', audio.id)}>{audio.name}</button>
                             ))}
                           </div>
                         )}
@@ -391,7 +391,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     type="number"
                     value={Math.abs(endSettings.alertTime ?? 0)}
                     onChange={(e) => {
-                      const value = parseFloat(e.target.value) || 0
+                      const value = Math.max(0, parseFloat(e.target.value) || 0)
                       onUpdate({
                         endSettings: {
                           ...endSettings,
@@ -500,9 +500,9 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         </Button>
                         {endAudioSelectOpen && (
                           <div className="rounded-md border bg-popover p-1 shadow-sm">
-                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', NO_AUDIO_VALUE)}>无音效</button>
+                            <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent active:bg-accent/80 active:scale-[0.99]" onClick={() => updateSoundSelection('sound-end', NO_AUDIO_VALUE)}>无音效</button>
                             {audioLibrary.map((audio) => (
-                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => updateSoundSelection('sound-end', audio.id)}>{audio.name}</button>
+                              <button key={audio.id} type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent active:bg-accent/80 active:scale-[0.99]" onClick={() => updateSoundSelection('sound-end', audio.id)}>{audio.name}</button>
                             ))}
                           </div>
                         )}

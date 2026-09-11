@@ -51,7 +51,7 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
               <Input
                 type="number"
                 value={loop.loopCount || 1}
-                onChange={(e) => onUpdate({ loopCount: parseInt(e.target.value) || 1 })}
+                onChange={(e) => onUpdate({ loopCount: Math.max(1, parseInt(e.target.value) || 1) })}
                 min="1"
               />
             </div>
@@ -64,8 +64,9 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
                 <Input
                   type="number"
                   value={loop.loopDuration || 60}
-                  onChange={(e) => onUpdate({ loopDuration: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => onUpdate({ loopDuration: Math.max(0.001, parseFloat(e.target.value) || 0.001) })}
                   step="0.1"
+                  min="0.001"
                   className="flex-1"
                 />
                 <Select 
