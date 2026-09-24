@@ -259,16 +259,18 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 opacity-50">
               <div className="flex items-center gap-3">
                 <Image className="text-primary" size={24} />
                 <h3 className="text-lg font-semibold">壁纸设置</h3>
               </div>
               
               <div className="space-y-3 pl-9">
+                <p className="text-sm text-muted-foreground">暂未开放，当前仅支持听觉提示</p>
                 <div className="flex items-center justify-between">
                   <Label>随机壁纸</Label>
                   <Switch
+                    disabled
                     checked={runningSettings.wallpaperMode === 'random'}
                     onCheckedChange={(checked) =>
                       onUpdate({
@@ -290,10 +292,12 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         accept="image/*,video/*"
                         ref={wallpaperRunningRef}
                         onChange={(e) => handleFileUpload(e.target.files?.[0], 'wallpaper-running')}
+                        disabled
                         className="hidden"
                       />
                       <Button
                         variant="outline"
+                        disabled
                         onClick={() => wallpaperRunningRef.current?.click()}
                         className="flex-1"
                       >
@@ -303,6 +307,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       {runningSettings.wallpaper && (
                         <Button
                           variant="secondary"
+                          disabled
                           onClick={() =>
                             onUpdate({
                               runningSettings: {
@@ -328,17 +333,19 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 opacity-50">
               <div className="flex items-center gap-3">
                 <Vibrate className="text-primary" size={24} />
                 <h3 className="text-lg font-semibold">震动设置</h3>
               </div>
               
               <div className="space-y-3 pl-9">
+                <p className="text-sm text-muted-foreground">暂未开放，当前仅支持听觉提示</p>
                 <div className="flex items-center justify-between">
                   <Label>启用震动</Label>
                   <Switch
-                    checked={runningSettings.enableVibration}
+                    disabled
+                    checked={false}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         runningSettings: {
@@ -518,16 +525,18 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 opacity-50">
               <div className="flex items-center gap-3">
                 <Image className="text-primary" size={24} />
                 <h3 className="text-lg font-semibold">壁纸设置</h3>
               </div>
               
               <div className="space-y-3 pl-9">
+                <p className="text-sm text-muted-foreground">暂未开放，当前仅支持听觉提示</p>
                 <div className="flex items-center justify-between">
                   <Label>随机壁纸</Label>
                   <Switch
+                    disabled
                     checked={endSettings.wallpaperMode === 'random'}
                     onCheckedChange={(checked) =>
                       onUpdate({
@@ -549,10 +558,12 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                         accept="image/*,video/*"
                         ref={wallpaperEndRef}
                         onChange={(e) => handleFileUpload(e.target.files?.[0], 'wallpaper-end')}
+                        disabled
                         className="hidden"
                       />
                       <Button
                         variant="outline"
+                        disabled
                         onClick={() => wallpaperEndRef.current?.click()}
                         className="flex-1"
                       >
@@ -562,6 +573,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                       {endSettings.wallpaper && (
                         <Button
                           variant="secondary"
+                          disabled
                           onClick={() =>
                             onUpdate({
                               endSettings: {
@@ -587,17 +599,19 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 opacity-50">
               <div className="flex items-center gap-3">
                 <Vibrate className="text-primary" size={24} />
                 <h3 className="text-lg font-semibold">震动设置</h3>
               </div>
               
               <div className="space-y-3 pl-9">
+                <p className="text-sm text-muted-foreground">暂未开放，当前仅支持听觉提示</p>
                 <div className="flex items-center justify-between">
                   <Label>启用震动</Label>
                   <Switch
-                    checked={endSettings.enableVibration}
+                    disabled
+                    checked={false}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         endSettings: {

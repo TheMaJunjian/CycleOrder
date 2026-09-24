@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState } from '@/types'
-import { convertToMilliseconds, formatTime, generateId, vibrateDevice, TIME_UNITS } from '@/lib/timer-utils'
+import { convertToMilliseconds, formatTime, generateId, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Play, Pause, SkipForward, Stop, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -46,20 +45,18 @@ function App() {
     lastUpdatedAt: Date.now(),
   })
 
-  const [showAlert, setShowAlert] = useState(false)
-  const [completedStage, setCompletedStage] = useState<Stage | null>(null)
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
   const customSoundRef = useRef<HTMLAudioElement | null>(null)
+  const customSoundReferenceRef = useRef<string | null>(null)
   const alertSoundRef = useRef<HTMLAudioElement | null>(null)
   const endSoundRef = useRef<HTMLAudioElement | null>(null)
   const beepSourceRef = useRef<OscillatorNode | null>(null)
   const audioGenerationRef = useRef(0)
   const endSoundGenerationRef = useRef(0)
   const isAlertPlayingRef = useRef(false)
-  const isAlertVibrationPlayedRef = useRef(false)
   const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<string>('')
 
@@ -199,7 +196,16 @@ function App() {
       
       if (currentStage && stageChanged) {
         const preserveOutsideAlert = isOutsideAlertPlayingRef.current
-        stopAllEffects(true, preserveOutsideAlert)
+        const runningSound = currentStage.runningSettings
+        const preserveRunningSound = Boolean(
+          !preserveOutsideAlert &&
+          !settings.muteAudio &&
+          !runningSound.randomSound &&
+          runningSound.soundFile &&
+          !isMissingAudioReference(runningSound.soundFile) &&
+          runningSound.soundFile === customSoundReferenceRef.current
+        )
+        stopAllEffects(true, preserveOutsideAlert, preserveRunningSound)
         if (preserveOutsideAlert) {
           isOutsideAlertPlayingRef.current = false
         } else {
@@ -228,10 +234,6 @@ function App() {
             if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
-                if (currentStage.endSettings?.enableVibration && !isAlertVibrationPlayedRef.current) {
-                  vibrateDevice(currentStage.endSettings.vibrationPattern || [200, 100, 200, 100, 400])
-                  isAlertVibrationPlayedRef.current = true
-                }
                 playAlertSound(currentStage)
               }
             } else {
@@ -288,9 +290,6 @@ function App() {
             
             const nextStage = getStageAtPath(stages, nextStagePath)
             if (currentStage.endSettings?.alertTime && currentStage.endSettings.alertTiming === 'outside') {
-              if (currentStage.endSettings.enableVibration) {
-                vibrateDevice(currentStage.endSettings.vibrationPattern || [200, 100, 200, 100, 400])
-              }
               if ((currentStage.endSettings.soundFile && !isMissingAudioReference(currentStage.endSettings.soundFile)) || currentStage.endSettings.randomSound) {
                 isOutsideAlertPlayingRef.current = true
                 stopAllEffects()
@@ -345,9 +344,6 @@ function App() {
       playBackgroundNoise()
     }
 
-    if (stage.runningSettings.enableVibration) {
-      vibrateDevice(stage.runningSettings.vibrationPattern || [50, 2000])
-    }
   }
 
   const resumeAudioContext = async () => {
@@ -385,12 +381,20 @@ function App() {
   }
 
   const playCustomSound = async (soundReference: string) => {
+    if (customSoundReferenceRef.current === soundReference && customSoundRef.current) {
+      if (customSoundRef.current.paused) {
+        void customSoundRef.current.play().catch((e) => console.error('Failed to resume custom sound', e))
+      }
+      return
+    }
+
     const generation = audioGenerationRef.current
     try {
       if (customSoundRef.current) {
         customSoundRef.current.pause()
         revokeAudioSource(customSoundRef.current)
         customSoundRef.current = null
+        customSoundReferenceRef.current = null
       }
 
       const actualDataUrl = await resolveAudioSource(soundReference)
@@ -403,6 +407,7 @@ function App() {
       audio.loop = true
       audio.volume = 0.3
       customSoundRef.current = audio
+      customSoundReferenceRef.current = soundReference
       audio.play().catch((e) => console.error('Failed to play custom sound', e))
     } catch (e) {
       console.error('Failed to load custom sound', e)
@@ -438,7 +443,11 @@ function App() {
     }
   }
 
-  const stopAllEffects = (preserveEndSound = false, preserveAlertSound = false) => {
+  const stopAllEffects = (
+    preserveEndSound = false,
+    preserveAlertSound = false,
+    preserveRunningSound = false
+  ) => {
     if (!preserveAlertSound) {
       audioGenerationRef.current += 1
     }
@@ -446,10 +455,11 @@ function App() {
       noiseSourceRef.current.stop()
       noiseSourceRef.current = null
     }
-    if (customSoundRef.current) {
+    if (!preserveRunningSound && customSoundRef.current) {
       customSoundRef.current.pause()
       revokeAudioSource(customSoundRef.current)
       customSoundRef.current = null
+      customSoundReferenceRef.current = null
     }
     if (!preserveAlertSound && alertSoundRef.current) {
       alertSoundRef.current.pause()
@@ -475,7 +485,6 @@ function App() {
     }
     if (!preserveAlertSound) {
       isAlertPlayingRef.current = false
-      isAlertVibrationPlayedRef.current = false
     }
   }
 
@@ -492,7 +501,6 @@ function App() {
       return
     }
 
-    stopAllEffects()
     const generation = audioGenerationRef.current
 
     if (stage.endSettings.soundFile && !isMissingAudioReference(stage.endSettings.soundFile) && !stage.endSettings.randomSound) {
@@ -528,7 +536,10 @@ function App() {
   }
 
   const handleStageComplete = (stage: Stage) => {
-    stopAllEffects()
+    if (noiseSourceRef.current) {
+      noiseSourceRef.current.stop()
+      noiseSourceRef.current = null
+    }
     stopAlertSound()
 
     const alertTime = stage.endSettings?.alertTime ?? 0
@@ -541,10 +552,6 @@ function App() {
       }
     }
 
-    if (settings?.showFullscreenAlert && alertTime !== 0) {
-      setCompletedStage(stage)
-      setShowAlert(true)
-    }
   }
 
   const playEndSound = async (soundReference: string) => {
@@ -1327,12 +1334,13 @@ function App() {
         <Card className="p-4 md:p-5 space-y-3">
           <h3 className="text-lg font-semibold">全局设置</h3>
           <p className="text-xs text-muted-foreground">
-            各阶段的震动请在阶段设置中单独开启；震动仅在支持 Vibration API 的移动浏览器中可用。
+            视觉提醒、点击确认与震动暂未开放，当前仅支持听觉提示。
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 opacity-50">
               <label className="text-sm font-medium">阶段切换提醒</label>
               <Switch
+                disabled
                 checked={settings?.showFullscreenAlert ?? true}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
                   showFullscreenAlert: checked,
@@ -1344,9 +1352,10 @@ function App() {
                 }))}
               />
             </div>
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 opacity-50">
               <label className="text-sm font-medium">强制确认</label>
               <Switch
+                disabled
                 checked={settings?.forceAcknowledge ?? false}
                 onCheckedChange={(checked) => setSettings((s) => ({ 
                   showFullscreenAlert: s?.showFullscreenAlert ?? true,
@@ -1377,33 +1386,6 @@ function App() {
 
       </div>
 
-      <Dialog open={showAlert} onOpenChange={setShowAlert}>
-        <DialogContent className="sm:max-w-md relative overflow-hidden">
-          {completedStage && completedStage.endSettings?.wallpaper && (
-            <div 
-              className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
-              style={{ 
-                  backgroundImage: `url(${completedStage.endSettings.wallpaper.split('|||').pop()})`
-              }}
-            />
-          )}
-          <div className="relative z-10">
-            <DialogHeader>
-              <DialogTitle className="text-2xl text-center">阶段完成</DialogTitle>
-            </DialogHeader>
-            <div className="text-center space-y-4 py-6">
-              <p className="text-lg">
-                <span className="font-semibold text-primary">{completedStage?.name}</span> 已完成
-              </p>
-              {currentStage && (
-                <p className="text-muted-foreground">
-                  下一阶段: <span className="font-medium">{currentStage.name}</span>
-                </p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
