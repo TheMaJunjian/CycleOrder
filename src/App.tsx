@@ -1383,7 +1383,7 @@ function App() {
                                         <SelectTrigger className="h-8 w-24 text-sm" onClick={(event) => event.stopPropagation()}>
                                           <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent onClick={(event) => event.stopPropagation()}>
                                           <SelectItem value="milliseconds">毫秒</SelectItem>
                                           <SelectItem value="seconds">秒</SelectItem>
                                           <SelectItem value="minutes">分钟</SelectItem>
@@ -1444,7 +1444,7 @@ function App() {
                           <SelectTrigger className="w-24 h-8 text-sm" onClick={(e) => e.stopPropagation()}>
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent onClick={(event) => event.stopPropagation()}>
                             <SelectItem value="milliseconds">毫秒</SelectItem>
                             <SelectItem value="seconds">秒</SelectItem>
                             <SelectItem value="minutes">分钟</SelectItem>
