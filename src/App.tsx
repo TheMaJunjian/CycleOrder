@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState, SOUND_CATEGORIES, SoundCategory } from '@/types'
+import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState, SOUND_CATEGORIES, SoundCategory, SoundIntensity } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,8 @@ const StrategyManagementDialog = lazy(() =>
     default: StrategyManagementDialog,
   }))
 )
+
+const MAX_STAGE_TRANSITIONS_PER_TICK = 1000
 
 function App() {
   useEffect(() => {
@@ -76,6 +78,7 @@ function App() {
   const outsideAlertSoundsRef = useRef(new Map<number, {
     playerId: string
     category: SoundCategory
+    intensity: SoundIntensity
     label: string
     audio: HTMLAudioElement | null
     beepKey: string | null
@@ -86,8 +89,10 @@ function App() {
   const beepSourcesRef = useRef(new Map<string, AudioBufferSourceNode>())
   const beepGenerationsRef = useRef(new Map<string, number>())
   const beepCategoriesRef = useRef(new Map<string, SoundCategory>())
+  const beepIntensitiesRef = useRef(new Map<string, SoundIntensity>())
   const beepLabelsRef = useRef(new Map<string, string>())
   const noiseGenerationRef = useRef(0)
+  const noiseIntensityRef = useRef<SoundIntensity>('weak')
   const outsideAlertGenerationRef = useRef(0)
   const outsideAlertSequenceRef = useRef(0)
   const activeAlertStageIdRef = useRef<string | null>(null)
@@ -212,9 +217,13 @@ function App() {
     return [...prefixes, leafStage?.name || ''].filter(Boolean).join(' / ')
   }
 
-  const getSoundDisplayLabel = (soundSettings: Stage['runningSettings']): string => {
+  const getSoundDisplayLabel = (
+    soundSettings: Stage['runningSettings'],
+    defaultIntensity: SoundIntensity = 'weak'
+  ): string => {
+    const intensityLabel = (soundSettings.soundIntensity ?? defaultIntensity) === 'strong' ? '强' : '弱'
     const soundName = soundSettings.randomSound
-      ? `随机音效-${SOUND_CATEGORIES.find(({ value }) => value === (soundSettings.soundCategory ?? 'wind'))?.label ?? '风声'}`
+      ? `随机音效-${intensityLabel}${SOUND_CATEGORIES.find(({ value }) => value === (soundSettings.soundCategory ?? 'wind'))?.label ?? '风声'}`
       : soundSettings.soundFile
         ? isMissingAudioReference(soundSettings.soundFile)
           ? `缺少音效文件：${getAudioDisplayName(soundSettings.soundFile) || '未知文件'}`
@@ -268,7 +277,7 @@ function App() {
     stopAlertSound: () => {},
     playStageRunningEffects: (_stage: Stage) => {},
     playAlertSound: (_stage: Stage, _isOutside?: boolean, _outsideDurationMs?: number) => {},
-    playStageEndSound: (_stage: Stage, _nextStage: Stage) => {},
+    playStageEndSound: (_stage: Stage, _nextStage: Stage, _elapsedIntoNextStage?: number) => {},
   })
 
   useEffect(() => {
@@ -280,7 +289,7 @@ function App() {
       prevStageIndexRef.current = stagePathKey
 
       const runningSoundKey = currentStage
-        ? `${currentStage.id}:${currentStage.runningSettings?.randomSound}:${currentStage.runningSettings?.soundFile}:${currentStage.runningSettings?.soundCategory}`
+        ? `${currentStage.id}:${currentStage.runningSettings?.randomSound}:${currentStage.runningSettings?.soundFile}:${currentStage.runningSettings?.soundCategory}:${currentStage.runningSettings?.soundIntensity}`
         : ''
       const soundSettingsChanged = prevStageSoundKeyRef.current !== runningSoundKey
       prevStageSoundKeyRef.current = runningSoundKey
@@ -293,94 +302,111 @@ function App() {
         timerEffectCallbacksRef.current.setTimerState((prev) => {
           const now = Date.now()
           const elapsedSinceLastUpdate = Math.max(0, now - (prev.lastUpdatedAt || now))
-          const newElapsed = prev.currentStageElapsed + elapsedSinceLastUpdate
-          const runtimeStagePath = timerEffectCallbacksRef.current.getFirstLeafPath(stages, prev.currentStageIndex)
-          const currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, runtimeStagePath)
-          
+          let currentStageElapsed = prev.currentStageElapsed + elapsedSinceLastUpdate
+          let currentStagePath = timerEffectCallbacksRef.current.getFirstLeafPath(stages, prev.currentStageIndex)
+          let currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, currentStagePath)
+          let elapsedBeforeCurrentStage = Math.max(0, prev.totalElapsed - prev.currentStageElapsed)
+          let currentLoop = loop
+          let completedStage: Stage | undefined
+          let nextStageAfterCompletion: Stage | undefined
+          let transitionCount = 0
+          let loopChanged = false
+
           if (!currentStage) return prev
 
-          const stageDuration = Math.max(1, convertToMilliseconds(currentStage.duration, currentStage.unit))
-          
-          const alertTime = currentStage.endSettings?.alertTime ?? 0
-          const alertTimeUnit = currentStage.endSettings?.alertTimeUnit ?? 'seconds'
-          const alertTiming = currentStage.endSettings?.alertTiming ?? 'inside'
-          const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
-          
-          const timeUntilEnd = stageDuration - newElapsed
-          if (
-            alertTiming === 'inside' &&
-            alertTime !== 0 &&
-            activeAlertStageIdRef.current !== currentStage.id &&
-            timeUntilEnd <= alertTimeMs &&
-            timeUntilEnd > 0
-          ) {
-            timerEffectCallbacksRef.current.playAlertSound(currentStage)
-          }
+          while (currentStage && transitionCount < MAX_STAGE_TRANSITIONS_PER_TICK) {
+            const stageDuration = Math.max(1, convertToMilliseconds(currentStage.duration, currentStage.unit))
+            if (currentStageElapsed < stageDuration) break
 
-          if (newElapsed >= stageDuration) {
-            const nextStagePath = timerEffectCallbacksRef.current.getNextStagePath(stages, runtimeStagePath)
-            
-            if (!nextStagePath) {
-              const nextLoop: Loop = loop
-                ? {
-                    ...loop,
-                    currentIteration: (loop.currentIteration || 0) + 1,
-                    totalElapsed: (loop.totalElapsed || 0) + prev.totalElapsed + newElapsed,
-                  }
-                : {
-                    id: generateId(),
-                    name: '主循环',
-                    stages,
-                    loopMode: 'infinite',
-                    currentIteration: 1,
-                    totalElapsed: prev.totalElapsed + newElapsed,
-                  }
-              timerEffectCallbacksRef.current.setLoop(nextLoop)
-              
-              if (!timerEffectCallbacksRef.current.shouldContinueLoop(nextLoop)) {
-                timerEffectCallbacksRef.current.stopAllEffects()
-                toast.success('循环已完成')
-                return {
-                  ...prev,
-                  isRunning: false,
-                  currentStageIndex: [0],
-                  currentStageElapsed: 0,
-                  totalElapsed: 0,
-                  lastUpdatedAt: now,
+            currentStageElapsed -= stageDuration
+            elapsedBeforeCurrentStage += stageDuration
+            transitionCount += 1
+
+            const nextStagePath = timerEffectCallbacksRef.current.getNextStagePath(stages, currentStagePath)
+            const nextStage = nextStagePath
+              ? timerEffectCallbacksRef.current.getStageAtPath(stages, nextStagePath)
+              : undefined
+            completedStage = currentStage
+
+            if (nextStagePath && nextStage) {
+              currentStagePath = nextStagePath
+              currentStage = nextStage
+              nextStageAfterCompletion = nextStage
+              continue
+            }
+
+            const nextLoop: Loop = currentLoop
+              ? {
+                  ...currentLoop,
+                  currentIteration: (currentLoop.currentIteration || 0) + 1,
+                  totalElapsed: (currentLoop.totalElapsed || 0) + elapsedBeforeCurrentStage,
                 }
-              }
+              : {
+                  id: generateId(),
+                  name: '主循环',
+                  stages,
+                  loopMode: 'infinite',
+                  currentIteration: 1,
+                  totalElapsed: elapsedBeforeCurrentStage,
+                }
+            currentLoop = nextLoop
+            loopChanged = true
 
-              const nextStage = timerEffectCallbacksRef.current.getStageAtPath(
-                stages,
-                timerEffectCallbacksRef.current.getInitialStagePath(stages)
-              )
-              if (nextStage) timerEffectCallbacksRef.current.playStageEndSound(currentStage, nextStage)
-              
+            if (!timerEffectCallbacksRef.current.shouldContinueLoop(nextLoop)) {
+              timerEffectCallbacksRef.current.setLoop(nextLoop)
+              timerEffectCallbacksRef.current.stopAllEffects()
+              toast.success('循环已完成')
               return {
                 ...prev,
-                currentStageIndex: timerEffectCallbacksRef.current.getInitialStagePath(stages),
+                isRunning: false,
+                currentStageIndex: [0],
                 currentStageElapsed: 0,
                 totalElapsed: 0,
                 lastUpdatedAt: now,
               }
             }
 
-            const nextStage = timerEffectCallbacksRef.current.getStageAtPath(stages, nextStagePath)
-            if (nextStage) timerEffectCallbacksRef.current.playStageEndSound(currentStage, nextStage)
-            
-            return {
-              ...prev,
-              currentStageIndex: nextStagePath,
-              currentStageElapsed: 0,
-              totalElapsed: prev.totalElapsed + newElapsed,
-              lastUpdatedAt: now,
-            }
+            elapsedBeforeCurrentStage = 0
+            currentStagePath = timerEffectCallbacksRef.current.getInitialStagePath(stages)
+            currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, currentStagePath)
+            nextStageAfterCompletion = currentStage
+          }
+
+          if (loopChanged && currentLoop) {
+            timerEffectCallbacksRef.current.setLoop(currentLoop)
+          }
+          if (completedStage && nextStageAfterCompletion) {
+            timerEffectCallbacksRef.current.playStageEndSound(
+              completedStage,
+              nextStageAfterCompletion,
+              currentStageElapsed
+            )
+          }
+
+          const stageDuration = currentStage
+            ? Math.max(1, convertToMilliseconds(currentStage.duration, currentStage.unit))
+            : 0
+          const alertTime = currentStage?.endSettings?.alertTime ?? 0
+          const alertTimeUnit = currentStage?.endSettings?.alertTimeUnit ?? 'seconds'
+          const alertTiming = currentStage?.endSettings?.alertTiming ?? 'inside'
+          const timeUntilEnd = stageDuration - currentStageElapsed
+          if (
+            transitionCount === 0 &&
+            currentStage &&
+            alertTiming === 'inside' &&
+            alertTime !== 0 &&
+            activeAlertStageIdRef.current !== currentStage.id &&
+            timeUntilEnd <= convertToMilliseconds(alertTime, alertTimeUnit) &&
+            timeUntilEnd > 0
+          ) {
+            timerEffectCallbacksRef.current.playAlertSound(currentStage)
           }
 
           return {
             ...prev,
-            currentStageElapsed: newElapsed,
-            totalElapsed: prev.totalElapsed + elapsedSinceLastUpdate,
+            currentStageIndex: currentStagePath,
+            currentStageElapsed,
+            totalElapsed: elapsedBeforeCurrentStage + currentStageElapsed,
             lastUpdatedAt: now,
           }
         })
@@ -427,6 +453,7 @@ function App() {
       !settings?.muteAudio &&
       stage.runningSettings.randomSound &&
       noiseCategoryRef.current === (stage.runningSettings.soundCategory ?? 'wind') &&
+      noiseIntensityRef.current === (stage.runningSettings.soundIntensity ?? 'weak') &&
       sharedSoundKindRef.current === 'noise' &&
       (noiseSourceRef.current || isNoiseStartingRef.current)
     ) {
@@ -438,7 +465,11 @@ function App() {
     if (soundReference) {
       playSharedSound(soundReference, 0.3, soundLabel)
     } else if (!settings?.muteAudio && stage.runningSettings.randomSound) {
-      playBackgroundNoise(stage.runningSettings.soundCategory ?? 'wind', soundLabel)
+      playBackgroundNoise(
+        stage.runningSettings.soundCategory ?? 'wind',
+        soundLabel,
+        stage.runningSettings.soundIntensity ?? 'weak'
+      )
     }
 
   }
@@ -571,7 +602,8 @@ function App() {
       await playBeep(
         'shared',
         stage.endSettings.soundCategory ?? 'wind',
-        getSoundDisplayLabel(stage.endSettings)
+        getSoundDisplayLabel(stage.endSettings, 'strong'),
+        stage.endSettings.soundIntensity ?? 'strong'
       )
     }
   }
@@ -602,11 +634,13 @@ function App() {
     const alertId = ++outsideAlertSequenceRef.current
     const generation = outsideAlertGenerationRef.current
     const category = endSettings.soundCategory ?? 'wind'
-    const label = getSoundDisplayLabel(endSettings)
+    const intensity = endSettings.soundIntensity ?? 'strong'
+    const label = getSoundDisplayLabel(endSettings, 'strong')
     const playerId = `outside-alert-${alertId}`
     const alert = {
       playerId,
       category,
+      intensity,
       label,
       audio: null as HTMLAudioElement | null,
       beepKey: endSettings.randomSound ? playerId : null,
@@ -621,7 +655,7 @@ function App() {
     }
 
     if (endSettings.randomSound) {
-      void playBeep(alert.beepKey!, category, label)
+      void playBeep(alert.beepKey!, category, label, intensity)
       return
     }
 
@@ -647,7 +681,12 @@ function App() {
     }
   }
 
-  const createRandomSoundSource = (audioContext: AudioContext, category: SoundCategory, loop = true) => {
+  const createRandomSoundSource = (
+    audioContext: AudioContext,
+    category: SoundCategory,
+    loop = true,
+    intensity: SoundIntensity = 'weak'
+  ) => {
     const durationSeconds = loop ? 6 : 8 + Math.floor(Math.random() * 5)
     const sampleRate = audioContext.sampleRate
     const buffer = audioContext.createBuffer(1, sampleRate * durationSeconds, sampleRate)
@@ -727,7 +766,7 @@ function App() {
     volume.gain.value = category === 'thunder' ? 0.18
       : category === 'forest' || category === 'night' ? 0.14
         : 0.2
-    volume.gain.value *= 0.9 + Math.random() * 0.2
+    volume.gain.value *= (intensity === 'strong' ? 2.5 : 0.35) * (0.9 + Math.random() * 0.2)
     const source = audioContext.createBufferSource()
     source.buffer = buffer
     source.loop = loop
@@ -737,13 +776,18 @@ function App() {
     return source
   }
 
-  const startBackgroundNoiseSegment = (audioContext: AudioContext, category: SoundCategory, generation: number) => {
+  const startBackgroundNoiseSegment = (
+    audioContext: AudioContext,
+    category: SoundCategory,
+    generation: number,
+    intensity: SoundIntensity
+  ) => {
     if (generation !== noiseGenerationRef.current || audioPausedRef.current) return
 
-    const source = createRandomSoundSource(audioContext, category, false)
+    const source = createRandomSoundSource(audioContext, category, false, intensity)
     source.addEventListener('ended', () => {
       if (noiseSourceRef.current === source) noiseSourceRef.current = null
-      startBackgroundNoiseSegment(audioContext, category, generation)
+      startBackgroundNoiseSegment(audioContext, category, generation, intensity)
     }, { once: true })
     source.start()
     noiseSourceRef.current = source
@@ -751,13 +795,15 @@ function App() {
 
   const playBackgroundNoise = async (
     category: SoundCategory = 'wind',
-    label: string = noiseSoundLabelRef.current
+    label: string = noiseSoundLabelRef.current,
+    intensity: SoundIntensity = 'weak'
   ) => {
     if (!settings || settings.muteAudio) return
     if (noiseSourceRef.current || isNoiseStartingRef.current) return
 
     const generation = noiseGenerationRef.current
     noiseCategoryRef.current = category
+    noiseIntensityRef.current = intensity
     noiseSoundLabelRef.current = label
     sharedSoundKindRef.current = 'noise'
     isNoiseStartingRef.current = true
@@ -773,7 +819,7 @@ function App() {
         return
       }
 
-      startBackgroundNoiseSegment(audioContext, category, generation)
+      startBackgroundNoiseSegment(audioContext, category, generation, intensity)
       updateActiveSoundPlayer('shared', label)
       isNoiseStartingRef.current = false
     } catch (e) {
@@ -822,13 +868,14 @@ function App() {
       void sharedSoundRef.current.play().catch((error) => console.error('Failed to resume shared sound', error))
     }
     if (!noiseSourceRef.current && sharedSoundKindRef.current === 'noise') {
-      void playBackgroundNoise(noiseCategoryRef.current, noiseSoundLabelRef.current)
+      void playBackgroundNoise(noiseCategoryRef.current, noiseSoundLabelRef.current, noiseIntensityRef.current)
     }
     if (sharedSoundKindRef.current === 'beep' && !beepSourcesRef.current.has('shared')) {
       void playBeep(
         'shared',
         beepCategoriesRef.current.get('shared') ?? 'wind',
-        beepLabelsRef.current.get('shared') ?? '随机音效-风声'
+        beepLabelsRef.current.get('shared') ?? '随机音效-风声',
+        beepIntensitiesRef.current.get('shared') ?? 'strong'
       )
     }
     if (audioContextRef.current?.state === 'suspended') {
@@ -846,12 +893,12 @@ function App() {
       alert.deadline = Date.now() + alert.remainingMs
       alert.timeout = window.setTimeout(() => stopOutsideAlert(alertId), alert.remainingMs)
       if (alert.beepKey && !beepSourcesRef.current.has(alert.beepKey)) {
-        void playBeep(alert.beepKey, alert.category, alert.label)
+        void playBeep(alert.beepKey, alert.category, alert.label, alert.intensity)
       }
     }
   }
 
-  const playStageEndSound = (stage: Stage, nextStage: Stage) => {
+  const playStageEndSound = (stage: Stage, nextStage: Stage, elapsedIntoNextStage = 0) => {
     const endSettings = stage.endSettings
     const alertTime = endSettings?.alertTime ?? 0
     const hasSound = Boolean(
@@ -862,10 +909,11 @@ function App() {
     if (!hasSound || settings?.muteAudio) return
     if (endSettings?.alertTiming !== 'outside') return
 
+    const nextStageDurationMs = convertToMilliseconds(nextStage.duration, nextStage.unit)
     const outsideDurationMs = Math.min(
       convertToMilliseconds(alertTime, endSettings.alertTimeUnit ?? 'seconds'),
-      convertToMilliseconds(nextStage.duration, nextStage.unit)
-    )
+      nextStageDurationMs
+    ) - Math.min(Math.max(0, elapsedIntoNextStage), nextStageDurationMs)
     void playOutsideAlertSound(stage, outsideDurationMs)
   }
 
@@ -898,14 +946,21 @@ function App() {
     }
     beepSourcesRef.current.delete(key)
     beepCategoriesRef.current.delete(key)
+    beepIntensitiesRef.current.delete(key)
     beepLabelsRef.current.delete(key)
     updateActiveSoundPlayer(key)
   }
 
-  const playBeep = async (key: string, category: SoundCategory = 'wind', label = '随机音效-风声') => {
+  const playBeep = async (
+    key: string,
+    category: SoundCategory = 'wind',
+    label = '随机音效-风声',
+    intensity: SoundIntensity = 'strong'
+  ) => {
     const generation = (beepGenerationsRef.current.get(key) ?? 0) + 1
     beepGenerationsRef.current.set(key, generation)
     beepCategoriesRef.current.set(key, category)
+    beepIntensitiesRef.current.set(key, intensity)
     beepLabelsRef.current.set(key, label)
     updateActiveSoundPlayer(key, label)
     try {
@@ -915,7 +970,7 @@ function App() {
       await resumeAudioContext()
       if (generation !== beepGenerationsRef.current.get(key) || audioPausedRef.current) return
 
-      const source = createRandomSoundSource(audioContextRef.current, category)
+      const source = createRandomSoundSource(audioContextRef.current, category, true, intensity)
       source.addEventListener('ended', () => {
         if (beepSourcesRef.current.get(key) === source) beepSourcesRef.current.delete(key)
       }, { once: true })
@@ -1271,7 +1326,7 @@ function App() {
   }, [currentSoundReference, currentStage?.runningSettings?.randomSound])
 
   const currentSoundLabel = currentStage?.runningSettings?.randomSound
-    ? `随机音效-${SOUND_CATEGORIES.find(({ value }) => value === (currentStage.runningSettings.soundCategory ?? 'wind'))?.label ?? '风声'}`
+    ? getSoundDisplayLabel(currentStage.runningSettings, 'weak')
     : currentSoundReference
       ? missingCurrentSoundReference === currentSoundReference
         ? `缺少音效文件：${getAudioDisplayName(currentSoundReference) || '未知文件'}`

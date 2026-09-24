@@ -16,6 +16,30 @@ const getWallpaperName = (wallpaper: string): string => wallpaper.startsWith('mi
   ? decodeURIComponent(wallpaper.slice('missing-wallpaper://'.length))
   : wallpaper.split('|||')[0]
 
+const migrateStageSoundIntensity = (stages: Stage[]): Stage[] => stages.map((stage) => ({
+  ...stage,
+  runningSettings: {
+    ...stage.runningSettings,
+    soundIntensity: stage.runningSettings?.soundIntensity ?? 'weak',
+  },
+  endSettings: {
+    ...stage.endSettings,
+    soundIntensity: stage.endSettings?.soundIntensity ?? 'strong',
+  },
+  embeddedStrategyStages: stage.embeddedStrategyStages
+    ? migrateStageSoundIntensity(stage.embeddedStrategyStages)
+    : stage.embeddedStrategyStages,
+}))
+
+const migrateStrategySoundIntensity = (strategy: Strategy): Strategy => ({
+  ...strategy,
+  stages: migrateStageSoundIntensity(strategy.stages),
+  loop: {
+    ...strategy.loop,
+    stages: migrateStageSoundIntensity(strategy.loop.stages || strategy.stages),
+  },
+})
+
 const mapStrategyStages = (
   stages: Stage[],
   mapSound: (soundFile: string | undefined) => string | undefined,
@@ -102,7 +126,9 @@ export function StrategyManagementDialog({
   const [strategies, setStrategies] = useState<Strategy[]>(() => {
     try {
       const storedStrategies = localStorage.getItem('cycle-order-saved-strategies')
-      return storedStrategies ? JSON.parse(storedStrategies) as Strategy[] : []
+      return storedStrategies
+        ? (JSON.parse(storedStrategies) as Strategy[]).map(migrateStrategySoundIntensity)
+        : []
     } catch {
       return []
     }
@@ -160,7 +186,7 @@ export function StrategyManagementDialog({
       updatedAt: Date.now(),
     }
 
-    setStrategies((current) => [...current, newStrategy])
+    setStrategies((current) => [...current, migrateStrategySoundIntensity(newStrategy)])
     setNewStrategyName('')
     setNewStrategyDescription('')
     toast.success(`策略"${newStrategy.name}"已保存`)
@@ -272,7 +298,7 @@ export function StrategyManagementDialog({
         : undefined
       const restoredStrategies = importedStrategies.map((value) => {
         const strategy = value
-        return {
+        return migrateStrategySoundIntensity({
           ...strategy,
           id: generateId(),
           stages: mapStrategyStages(strategy.stages || [], restoreSound, restoreWallpaper),
@@ -280,7 +306,7 @@ export function StrategyManagementDialog({
             ...strategy.loop,
             stages: mapStrategyStages(strategy.loop?.stages || strategy.stages || [], restoreSound, restoreWallpaper),
           },
-        }
+        })
       })
 
       setStrategies((current) => [...current, ...restoredStrategies])

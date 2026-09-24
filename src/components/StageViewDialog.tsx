@@ -1,4 +1,4 @@
-import { Stage, SOUND_CATEGORIES } from '@/types'
+import { Stage, SOUND_CATEGORIES, SoundIntensity } from '@/types'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,12 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
 
   const getSoundCategoryLabel = (category?: string): string =>
     SOUND_CATEGORIES.find((soundCategory) => soundCategory.value === category)?.label ?? '风声'
+
+  const getRandomSoundLabel = (
+    category: string | undefined,
+    intensity: SoundIntensity | undefined,
+    defaultIntensity: SoundIntensity
+  ): string => `${(intensity ?? defaultIntensity) === 'strong' ? '强' : '弱'}${getSoundCategoryLabel(category)}`
 
   const getTimeUnitLabel = (unit: string): string => {
     const labels: Record<string, string> = {
@@ -127,7 +133,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">随机音效:</span>
                             {runningSettings.randomSound ? (
-                              <span>{getSoundCategoryLabel(runningSettings.soundCategory)}</span>
+                              <span>{getRandomSoundLabel(runningSettings.soundCategory, runningSettings.soundIntensity, 'weak')}</span>
                             ) : (
                               <X className="text-muted-foreground" size={20} />
                             )}
@@ -199,7 +205,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">随机音效:</span>
                             {endSettings.randomSound ? (
-                              <span>{getSoundCategoryLabel(endSettings.soundCategory)}</span>
+                              <span>{getRandomSoundLabel(endSettings.soundCategory, endSettings.soundIntensity, 'strong')}</span>
                             ) : (
                               <X className="text-muted-foreground" size={20} />
                             )}

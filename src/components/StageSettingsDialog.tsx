@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Stage, TimeUnit, AlertTiming, SOUND_CATEGORIES, SoundCategory } from '@/types'
+import { Stage, TimeUnit, AlertTiming, SOUND_CATEGORIES, SoundCategory, SoundIntensity } from '@/types'
 import { createAudioReference, getAudioDisplayName, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -92,11 +92,21 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
     toast.success(`已选择上传音频：${audio.name}`)
   }
 
-  const updateSoundCategory = (type: 'running' | 'end', category: SoundCategory) => {
+  const updateRandomSoundVariant = (type: 'running' | 'end', variant: string) => {
+    const [intensity, category] = variant.split(':')
+    if (
+      (intensity !== 'weak' && intensity !== 'strong') ||
+      !SOUND_CATEGORIES.some((soundCategory) => soundCategory.value === category)
+    ) return
+
+    const soundVariant = {
+      soundIntensity: intensity as SoundIntensity,
+      soundCategory: category as SoundCategory,
+    }
     if (type === 'running') {
-      onUpdate({ runningSettings: { ...runningSettings, soundCategory: category } })
+      onUpdate({ runningSettings: { ...runningSettings, ...soundVariant } })
     } else {
-      onUpdate({ endSettings: { ...endSettings, soundCategory: category } })
+      onUpdate({ endSettings: { ...endSettings, ...soundVariant } })
     }
   }
 
@@ -209,16 +219,17 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
 
                 {runningSettings.randomSound && (
                   <div className="space-y-2">
-                    <Label>随机音效类型</Label>
+                    <Label>随机音效</Label>
                     <Select
-                      value={runningSettings.soundCategory ?? 'wind'}
-                      onValueChange={(category) => updateSoundCategory('running', category as SoundCategory)}
+                      value={`${runningSettings.soundIntensity ?? 'weak'}:${runningSettings.soundCategory ?? 'wind'}`}
+                      onValueChange={(variant) => updateRandomSoundVariant('running', variant)}
                     >
                       <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {SOUND_CATEGORIES.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
-                        ))}
+                        {SOUND_CATEGORIES.flatMap((category) => ([
+                          <SelectItem key={`weak:${category.value}`} value={`weak:${category.value}`}>弱{category.label}</SelectItem>,
+                          <SelectItem key={`strong:${category.value}`} value={`strong:${category.value}`}>强{category.label}</SelectItem>,
+                        ]))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -490,16 +501,17 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
 
                 {endSettings.randomSound && (
                   <div className="space-y-2">
-                    <Label>随机音效类型</Label>
+                    <Label>随机音效</Label>
                     <Select
-                      value={endSettings.soundCategory ?? 'wind'}
-                      onValueChange={(category) => updateSoundCategory('end', category as SoundCategory)}
+                      value={`${endSettings.soundIntensity ?? 'strong'}:${endSettings.soundCategory ?? 'wind'}`}
+                      onValueChange={(variant) => updateRandomSoundVariant('end', variant)}
                     >
                       <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {SOUND_CATEGORIES.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
-                        ))}
+                        {SOUND_CATEGORIES.flatMap((category) => ([
+                          <SelectItem key={`weak:${category.value}`} value={`weak:${category.value}`}>弱{category.label}</SelectItem>,
+                          <SelectItem key={`strong:${category.value}`} value={`strong:${category.value}`}>强{category.label}</SelectItem>,
+                        ]))}
                       </SelectContent>
                     </Select>
                   </div>

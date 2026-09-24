@@ -4,6 +4,8 @@ export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited'
 
 export type AlertTiming = 'inside' | 'outside'
 
+export type SoundIntensity = 'weak' | 'strong'
+
 export const SOUND_CATEGORIES = [
   { value: 'wind', label: '风声' },
   { value: 'thunder', label: '雷声' },
@@ -21,6 +23,7 @@ export interface StageSettings {
   soundFile?: string
   randomSound: boolean
   soundCategory?: SoundCategory
+  soundIntensity?: SoundIntensity
   wallpaper?: string
   wallpaperMode: 'fixed' | 'random'
   vibrationPattern?: number[]
