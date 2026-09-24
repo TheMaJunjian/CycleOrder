@@ -120,14 +120,16 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">音效</h4>
                       <div className="mt-2 space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">随机音效:</span>
-                          {runningSettings.randomSound ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
-                        </div>
+                        {(runningSettings.randomSound || !runningSettings.soundFile) && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">随机音效:</span>
+                            {runningSettings.randomSound ? (
+                              <Check className="text-green-600" size={20} />
+                            ) : (
+                              <X className="text-muted-foreground" size={20} />
+                            )}
+                          </div>
+                        )}
                         {!runningSettings.randomSound && runningSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
                               文件: {getAudioDisplayName(runningSettings.soundFile) || '已上传音效文件'}
@@ -190,14 +192,16 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">音效</h4>
                       <div className="mt-2 space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">随机音效:</span>
-                          {endSettings.randomSound ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
-                        </div>
+                        {(endSettings.randomSound || !endSettings.soundFile) && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">随机音效:</span>
+                            {endSettings.randomSound ? (
+                              <Check className="text-green-600" size={20} />
+                            ) : (
+                              <X className="text-muted-foreground" size={20} />
+                            )}
+                          </div>
+                        )}
                         {!endSettings.randomSound && endSettings.soundFile && (
                           <div className="text-xs text-muted-foreground">
                               文件: {getAudioDisplayName(endSettings.soundFile) || '已上传音效文件'}

@@ -78,7 +78,7 @@ function App() {
   const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<string>('')
   const hasRecoveredTimerRef = useRef(false)
-  const retryActiveAudioRef = useRef<() => void>(() => {})
+  const recoverAudioOnFocusRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     if (hasRecoveredTimerRef.current) return
@@ -99,22 +99,19 @@ function App() {
 
   useEffect(() => {
     const recoverAudio = () => {
-      if (noiseSourceRef.current || beepSourceRef.current) {
-        void resumeAudioContext().catch(() => {})
+      if (document.visibilityState === 'visible') {
+        recoverAudioOnFocusRef.current()
       }
-      retryActiveAudioRef.current()
     }
 
     window.addEventListener('focus', recoverAudio)
     document.addEventListener('visibilitychange', recoverAudio)
-    const recoveryInterval = window.setInterval(recoverAudio, 1000)
 
     return () => {
       window.removeEventListener('focus', recoverAudio)
       document.removeEventListener('visibilitychange', recoverAudio)
-      window.clearInterval(recoveryInterval)
     }
-  }, [settings?.muteAudio])
+  }, [])
 
   useEffect(() => {
     if (!stages) return
@@ -400,7 +397,13 @@ function App() {
       }
     }
   }
-  retryActiveAudioRef.current = retryActiveAudio
+
+  recoverAudioOnFocusRef.current = () => {
+    if (noiseSourceRef.current || beepSourceRef.current) {
+      void resumeAudioContext().catch(() => {})
+    }
+    retryActiveAudio()
+  }
 
   const resolveAudioSource = async (soundReference: string): Promise<string> => {
     const audioId = getAudioReferenceId(soundReference)
