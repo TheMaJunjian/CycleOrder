@@ -27,7 +27,7 @@ function App() {
     if (!audioSession) return
 
     try {
-      audioSession.type = 'ambient'
+      audioSession.type = 'playback'
     } catch (error) {
       console.warn('Failed to set ambient audio session', error)
     }
@@ -111,6 +111,14 @@ function App() {
       window.removeEventListener('focus', recoverAudio)
       document.removeEventListener('visibilitychange', recoverAudio)
     }
+  }, [])
+
+  useEffect(() => {
+    const recoveryInterval = window.setInterval(() => {
+      recoverAudioOnFocusRef.current()
+    }, 1000)
+
+    return () => window.clearInterval(recoveryInterval)
   }, [])
 
   useEffect(() => {
