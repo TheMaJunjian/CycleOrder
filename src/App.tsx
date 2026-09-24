@@ -1,19 +1,25 @@
-import { useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Play, Pause, SkipForward, Stop, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock, PlayCircle } from '@phosphor-icons/react'
+import { Play, Pause, SkipForward, Stop, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { StageViewDialog } from '@/components/StageViewDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
-import { StrategyManagementDialog } from '@/components/StrategyManagementDialog'
 import { getAudioReferenceId, getLocalAudioBlob, isMissingAudioReference } from '@/lib/audio-storage'
 import { useLocalStorage } from '@/hooks/use-local-storage'
+
+const StrategyManagementDialog = lazy(() =>
+  import('@/components/StrategyManagementDialog').then(({ StrategyManagementDialog }) => ({
+    default: StrategyManagementDialog,
+  }))
+)
 
 function App() {
   const [stages, setStages] = useLocalStorage<Stage[]>('timer-stages', [])
@@ -45,6 +51,7 @@ function App() {
   })
 
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
+  const [strategyDialogOpen, setStrategyDialogOpen] = useState(false)
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -59,8 +66,13 @@ function App() {
   const isAlertPlayingRef = useRef(false)
   const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<string>('')
+  const hasRecoveredTimerRef = useRef(false)
+  const retryActiveAudioRef = useRef<() => void>(() => {})
 
   useEffect(() => {
+    if (hasRecoveredTimerRef.current) return
+    hasRecoveredTimerRef.current = true
+
     if (!timerState.isRunning || timerState.isPaused || !timerState.lastUpdatedAt) return
 
     const elapsedSinceLastUpdate = Math.max(0, Date.now() - timerState.lastUpdatedAt)
@@ -72,14 +84,14 @@ function App() {
       totalElapsed: previous.totalElapsed + elapsedSinceLastUpdate,
       lastUpdatedAt: Date.now(),
     }))
-  }, [])
+  }, [setTimerState, timerState.isPaused, timerState.isRunning, timerState.lastUpdatedAt])
 
   useEffect(() => {
     const recoverAudio = () => {
       if (noiseSourceRef.current || beepSourceRef.current) {
         void resumeAudioContext().catch(() => {})
       }
-      retryActiveAudio()
+      retryActiveAudioRef.current()
     }
 
     window.addEventListener('focus', recoverAudio)
@@ -94,7 +106,7 @@ function App() {
   }, [settings?.muteAudio])
 
   useEffect(() => {
-    if (!stages || !loop) return
+    if (!stages) return
     setLoop((currentLoop) => {
       if (!currentLoop) {
         return {
@@ -108,7 +120,7 @@ function App() {
       }
       return { ...currentLoop, stages }
     })
-  }, [stages])
+  }, [setLoop, stages])
 
   const shouldContinueLoop = (loopState: Loop | undefined = loop): boolean => {
     if (!loopState) return false
@@ -144,12 +156,12 @@ function App() {
 
     const prefixes: string[] = []
     let currentStage: Stage | undefined = stageList[path[0]]
-    if (currentStage?.isEmbeddedStrategy) prefixes.push(currentStage.name)
+    if (currentStage?.isMerged || currentStage?.isEmbeddedStrategy) prefixes.push(currentStage.name)
 
     for (let depth = 1; depth < path.length - 1 && currentStage; depth += 1) {
       const nextStage = currentStage.embeddedStrategyStages?.[path[depth]]
       currentStage = nextStage
-      if (currentStage?.isEmbeddedStrategy) prefixes.push(currentStage.name)
+      if (currentStage?.isMerged || currentStage?.isEmbeddedStrategy) prefixes.push(currentStage.name)
     }
 
     const leafStage = getStageAtPath(stageList, path)
@@ -188,10 +200,25 @@ function App() {
     return undefined
   }
 
+  const timerEffectCallbacksRef = useRef({
+    getFirstLeafPath,
+    getStageAtPath,
+    getInitialStagePath,
+    getNextStagePath,
+    shouldContinueLoop,
+    setLoop,
+    setTimerState,
+    stopAllEffects: (_preserveEndSound?: boolean, _preserveAlertSound?: boolean, _preserveRunningSound?: boolean) => {},
+    stopAlertSound: () => {},
+    playStageRunningEffects: (_stage: Stage) => {},
+    playAlertSound: (_stage: Stage) => {},
+    handleStageComplete: (_stage: Stage) => {},
+  })
+
   useEffect(() => {
     if (timerState.isRunning && !timerState.isPaused && stages && settings && loop) {
-      const runtimeStagePath = getFirstLeafPath(stages, timerState.currentStageIndex)
-      const currentStage = getStageAtPath(stages, runtimeStagePath)
+      const runtimeStagePath = timerEffectCallbacksRef.current.getFirstLeafPath(stages, timerState.currentStageIndex)
+      const currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, runtimeStagePath)
       const stagePathKey = runtimeStagePath.join('.')
       const stageChanged = prevStageIndexRef.current !== stagePathKey
       prevStageIndexRef.current = stagePathKey
@@ -207,21 +234,21 @@ function App() {
           !isMissingAudioReference(runningSound.soundFile) &&
           runningSound.soundFile === customSoundReferenceRef.current
         )
-        stopAllEffects(true, preserveOutsideAlert, preserveRunningSound)
+        timerEffectCallbacksRef.current.stopAllEffects(true, preserveOutsideAlert, preserveRunningSound)
         if (preserveOutsideAlert) {
           isOutsideAlertPlayingRef.current = false
         } else {
-          playStageRunningEffects(currentStage)
+          timerEffectCallbacksRef.current.playStageRunningEffects(currentStage)
         }
       }
 
       intervalRef.current = window.setInterval(() => {
-        setTimerState((prev) => {
+        timerEffectCallbacksRef.current.setTimerState((prev) => {
           const now = Date.now()
           const elapsedSinceLastUpdate = Math.max(0, now - (prev.lastUpdatedAt || now))
           const newElapsed = prev.currentStageElapsed + elapsedSinceLastUpdate
-          const runtimeStagePath = getFirstLeafPath(stages, prev.currentStageIndex)
-          const currentStage = getStageAtPath(stages, runtimeStagePath)
+          const runtimeStagePath = timerEffectCallbacksRef.current.getFirstLeafPath(stages, prev.currentStageIndex)
+          const currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, runtimeStagePath)
           
           if (!currentStage) return prev
 
@@ -236,20 +263,20 @@ function App() {
             if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
-                playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.playAlertSound(currentStage)
               }
             } else {
               const alertStartTime = stageDuration
               if (newElapsed >= alertStartTime && prev.currentStageElapsed < alertStartTime) {
-                playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.playAlertSound(currentStage)
               }
             }
           }
 
           if (newElapsed >= stageDuration) {
-            handleStageComplete(currentStage)
+            timerEffectCallbacksRef.current.handleStageComplete(currentStage)
             
-            const nextStagePath = getNextStagePath(stages, runtimeStagePath)
+            const nextStagePath = timerEffectCallbacksRef.current.getNextStagePath(stages, runtimeStagePath)
             
             if (!nextStagePath) {
               const nextLoop: Loop = loop
@@ -266,10 +293,10 @@ function App() {
                     currentIteration: 1,
                     totalElapsed: prev.totalElapsed + newElapsed,
                   }
-              setLoop(nextLoop)
+              timerEffectCallbacksRef.current.setLoop(nextLoop)
               
-              if (!shouldContinueLoop(nextLoop)) {
-                stopAllEffects()
+              if (!timerEffectCallbacksRef.current.shouldContinueLoop(nextLoop)) {
+                timerEffectCallbacksRef.current.stopAllEffects()
                 toast.success('循环已完成')
                 return {
                   ...prev,
@@ -283,19 +310,18 @@ function App() {
               
               return {
                 ...prev,
-                currentStageIndex: getInitialStagePath(stages),
+                currentStageIndex: timerEffectCallbacksRef.current.getInitialStagePath(stages),
                 currentStageElapsed: 0,
                 totalElapsed: 0,
                 lastUpdatedAt: now,
               }
             }
             
-            const nextStage = getStageAtPath(stages, nextStagePath)
             if (currentStage.endSettings?.alertTime && currentStage.endSettings.alertTiming === 'outside') {
               if ((currentStage.endSettings.soundFile && !isMissingAudioReference(currentStage.endSettings.soundFile)) || currentStage.endSettings.randomSound) {
                 isOutsideAlertPlayingRef.current = true
-                stopAllEffects()
-                playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.stopAllEffects()
+                timerEffectCallbacksRef.current.playAlertSound(currentStage)
               }
             }
             
@@ -322,8 +348,8 @@ function App() {
         intervalRef.current = null
       }
       if (!timerState.isRunning) {
-        stopAllEffects()
-        stopAlertSound()
+        timerEffectCallbacksRef.current.stopAllEffects()
+        timerEffectCallbacksRef.current.stopAlertSound()
         prevStageIndexRef.current = ''
       }
     }
@@ -363,6 +389,7 @@ function App() {
       }
     }
   }
+  retryActiveAudioRef.current = retryActiveAudio
 
   const resolveAudioSource = async (soundReference: string): Promise<string> => {
     const audioId = getAudioReferenceId(soundReference)
@@ -558,6 +585,21 @@ function App() {
       }
     }
 
+  }
+
+  timerEffectCallbacksRef.current = {
+    getFirstLeafPath,
+    getStageAtPath,
+    getInitialStagePath,
+    getNextStagePath,
+    shouldContinueLoop,
+    setLoop,
+    setTimerState,
+    stopAllEffects,
+    stopAlertSound,
+    playStageRunningEffects,
+    playAlertSound,
+    handleStageComplete,
   }
 
   const playEndSound = async (soundReference: string) => {
@@ -951,21 +993,27 @@ function App() {
     ? getFirstLeafPath(stages, timerState.currentStageIndex)
     : timerState.currentStageIndex
   const currentStage = stages ? getStageAtPath(stages, currentStagePath) : undefined
+
+  useEffect(() => {
+    if (!timerState.isRunning || currentStage) return
+
+    setTimerState((previous) => ({
+      ...previous,
+      isRunning: false,
+      isPaused: false,
+      currentStageIndex: timerEffectCallbacksRef.current.getInitialStagePath(stages || []),
+      currentStageElapsed: 0,
+      totalElapsed: 0,
+      lastUpdatedAt: Date.now(),
+    }))
+  }, [currentStage, setTimerState, stages, timerState.isRunning])
+
   const remainingTime = currentStage
     ? convertToMilliseconds(currentStage.duration, currentStage.unit) - timerState.currentStageElapsed
     : 0
   const runningWallpaper = currentStage?.runningSettings?.wallpaperMode === 'fixed' && !currentStage.runningSettings.wallpaper?.startsWith('missing-wallpaper://')
     ? currentStage.runningSettings.wallpaper?.split('|||').pop()
     : undefined
-
-  const getLoopModeLabel = (mode: LoopMode): string => {
-    switch (mode) {
-      case 'infinite': return '无限���������环'
-      case 'fixed-count': return '固定次数循环'
-      case 'time-limited': return '限定时长循环'
-      default: return '无限循环'
-    }
-  }
 
   return (
     <div className="min-h-screen overflow-y-auto bg-background p-4 pb-20 md:p-6 md:pb-24 lg:p-8 lg:pb-28">
@@ -1078,18 +1126,23 @@ function App() {
                   </Button>
                 </>
               )}
-              <StrategyManagementDialog
-                currentStages={stages}
-                currentLoop={loop}
-                currentSettings={settings}
-                onLoadStrategy={handleLoadStrategy}
-                onRunStrategy={handleRunStrategy}
-              >
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
-                  <StackSimple size={16} className="mr-1.5" />
-                  策略
-                </Button>
-              </StrategyManagementDialog>
+              <Button onClick={() => setStrategyDialogOpen(true)} variant="outline" size="sm" className="flex-1 sm:flex-initial">
+                <StackSimple size={16} className="mr-1.5" />
+                策略
+              </Button>
+              {strategyDialogOpen && (
+                <Suspense fallback={null}>
+                  <StrategyManagementDialog
+                    open={strategyDialogOpen}
+                    onOpenChange={setStrategyDialogOpen}
+                    currentStages={stages}
+                    currentLoop={loop}
+                    currentSettings={settings}
+                    onLoadStrategy={handleLoadStrategy}
+                    onRunStrategy={handleRunStrategy}
+                  />
+                </Suspense>
+              )}
               <LoopSettingsDialog loop={loop!} onUpdate={updateLoop}>
                 <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
                   <Repeat size={16} className="mr-1.5" />
@@ -1225,15 +1278,11 @@ function App() {
                                   </div>
                                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     <div className="flex items-center gap-2 flex-1">
-                                      <Input
-                                        type="number"
-                                        value={childStage.duration || ''}
-                                        onChange={(event) => updateEmbeddedStage(stage.id, childStage.id, { duration: event.target.value === '' ? 0 : Math.max(0.001, parseFloat(event.target.value) || 0.001) })}
-                                        onBlur={() => {
-                                          if (!childStage.duration) {
-                                            updateEmbeddedStage(stage.id, childStage.id, { duration: 1 })
-                                          }
-                                        }}
+                                      <NumericInput
+                                        value={childStage.duration}
+                                        onValueCommit={(value) => updateEmbeddedStage(stage.id, childStage.id, {
+                                          duration: value === null ? 1 : Math.max(0.001, value),
+                                        })}
                                         onClick={(event) => event.stopPropagation()}
                                         className="h-8 w-20 text-sm"
                                         step="0.1"
@@ -1292,15 +1341,11 @@ function App() {
                   {!isMerged && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pl-7">
                       <div className="flex items-center gap-2 flex-1">
-                        <Input
-                          type="number"
-                          value={stage.duration || ''}
-                          onChange={(e) => updateStage(stage.id, { duration: e.target.value === '' ? 0 : Math.max(0.001, parseFloat(e.target.value) || 0.001) })}
-                          onBlur={() => {
-                            if (!stage.duration) {
-                              updateStage(stage.id, { duration: 1 })
-                            }
-                          }}
+                        <NumericInput
+                          value={stage.duration}
+                          onValueCommit={(value) => updateStage(stage.id, {
+                            duration: value === null ? 1 : Math.max(0.001, value),
+                          })}
                             onClick={(e) => e.stopPropagation()}
                           className="w-20 h-8 text-sm"
                           placeholder="时长"

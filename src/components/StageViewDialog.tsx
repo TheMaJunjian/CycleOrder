@@ -1,5 +1,5 @@
 import { Stage } from '@/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">阶段详情 - {stage.name}</DialogTitle>
+          <DialogDescription className="sr-only">查看阶段时长、提示设置和子阶段信息。</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, ReactNode } from 'react'
 import { Strategy, Stage, Loop, Settings, StrategyLoadMode, TimeUnit } from '@/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -81,7 +81,9 @@ interface StrategyManagementDialogProps {
   currentSettings: Settings | undefined
   onLoadStrategy: (stages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => void
   onRunStrategy: (strategy: Strategy) => void
-  children: ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children?: ReactNode
 }
 
 export function StrategyManagementDialog({
@@ -90,9 +92,13 @@ export function StrategyManagementDialog({
   currentSettings,
   onLoadStrategy,
   onRunStrategy,
+  open: controlledOpen,
+  onOpenChange: onControlledOpenChange,
   children,
 }: StrategyManagementDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onControlledOpenChange ?? setInternalOpen
   const [strategies, setStrategies] = useState<Strategy[]>(() => {
     try {
       const storedStrategies = localStorage.getItem('cycle-order-saved-strategies')
@@ -359,13 +365,14 @@ export function StrategyManagementDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl flex items-center gap-2">
             <StackSimple className="text-primary" />
             策略管理
           </DialogTitle>
+          <DialogDescription className="sr-only">保存、导入、导出或运行阶段策略。</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -567,6 +574,7 @@ export function StrategyManagementDialog({
           <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>{transferMode === 'export' ? '导出策略数据' : '导入策略数据'}</DialogTitle>
+              <DialogDescription className="sr-only">导入或导出策略 JSON 数据。</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 min-h-0 flex flex-1 flex-col">
               <Textarea

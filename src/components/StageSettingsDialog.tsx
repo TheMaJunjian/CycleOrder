@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { Stage, TimeUnit, AlertTiming } from '@/types'
 import { createAudioReference, getAudioDisplayName, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
@@ -167,9 +168,9 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl">阶段设置 - {stage.name}</DialogTitle>
-          <p className="text-xs text-muted-foreground">
+          <DialogDescription className="text-xs">
             音频仅保存在本机浏览器，不会上传服务器；清除站点数据后需要重新上传，也不会跨设备同步。
-          </p>
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="running" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -394,15 +395,13 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={Math.abs(endSettings.alertTime ?? 0)}
-                    onChange={(e) => {
-                      const value = Math.max(0, parseFloat(e.target.value) || 0)
+                    onValueCommit={(value) => {
                       onUpdate({
                         endSettings: {
                           ...endSettings,
-                          alertTime: value,
+                          alertTime: Math.max(0, value ?? 0),
                         },
                       })
                     }}

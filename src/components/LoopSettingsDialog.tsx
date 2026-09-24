@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Loop, TimeUnit, LoopMode } from '@/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Repeat } from '@phosphor-icons/react'
@@ -25,6 +24,7 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
             <Repeat className="text-primary" />
             循环设置
           </DialogTitle>
+          <DialogDescription className="sr-only">设置循环模式、次数或限定时长。</DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 mt-4">
@@ -48,10 +48,9 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
           {loop.loopMode === 'fixed-count' && (
             <div className="space-y-2">
               <Label>循环次数</Label>
-              <Input
-                type="number"
+              <NumericInput
                 value={loop.loopCount || 1}
-                onChange={(e) => onUpdate({ loopCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                onValueCommit={(value) => onUpdate({ loopCount: Math.max(1, Math.trunc(value ?? 1) || 1) })}
                 min="1"
               />
             </div>
@@ -61,10 +60,9 @@ export function LoopSettingsDialog({ loop, onUpdate, children }: LoopSettingsDia
             <div className="space-y-2">
               <Label>限定总时长</Label>
               <div className="flex gap-2">
-                <Input
-                  type="number"
+                <NumericInput
                   value={loop.loopDuration || 60}
-                  onChange={(e) => onUpdate({ loopDuration: Math.max(0.001, parseFloat(e.target.value) || 0.001) })}
+                  onValueCommit={(value) => onUpdate({ loopDuration: Math.max(0.001, value ?? 0.001) })}
                   step="0.1"
                   min="0.001"
                   className="flex-1"
