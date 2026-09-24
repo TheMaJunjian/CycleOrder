@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Play, Pause, SkipForward, Stop, Plus, Trash, GearSix, Repeat, Copy, Unite, StackSimple, Eye, Clock, PlayCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -56,6 +55,7 @@ function App() {
   const beepSourceRef = useRef<OscillatorNode | null>(null)
   const audioGenerationRef = useRef(0)
   const endSoundGenerationRef = useRef(0)
+  const webAudioGenerationRef = useRef(0)
   const isAlertPlayingRef = useRef(false)
   const isOutsideAlertPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<string>('')
@@ -76,7 +76,9 @@ function App() {
 
   useEffect(() => {
     const recoverAudio = () => {
-      void resumeAudioContext().catch(() => {})
+      if (noiseSourceRef.current || beepSourceRef.current) {
+        void resumeAudioContext().catch(() => {})
+      }
       retryActiveAudio()
     }
 
@@ -160,14 +162,14 @@ function App() {
 
   const getFirstLeafPath = (stageList: Stage[], path: number[]): number[] => {
     const stage = getStageAtPath(stageList, path)
-    return stage?.isEmbeddedStrategy && stage.embeddedStrategyStages?.length
+    return stage?.embeddedStrategyStages?.length
       ? getFirstLeafPath(stageList, [...path, 0])
       : path
   }
 
   const getNextStagePath = (stageList: Stage[], path: number[]): number[] | undefined => {
     const currentStage = getStageAtPath(stageList, path)
-    if (currentStage?.isEmbeddedStrategy && currentStage.embeddedStrategyStages?.length) {
+    if (currentStage?.embeddedStrategyStages?.length) {
       return getFirstLeafPath(stageList, [...path, 0])
     }
 
@@ -416,7 +418,8 @@ function App() {
 
   const playBackgroundNoise = async () => {
     if (!settings || settings.muteAudio) return
-    
+
+    const generation = webAudioGenerationRef.current
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
@@ -424,6 +427,8 @@ function App() {
 
       const audioContext = audioContextRef.current
       await resumeAudioContext()
+      if (generation !== webAudioGenerationRef.current) return
+
       const bufferSize = audioContext.sampleRate * 2
       const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate)
       const data = buffer.getChannelData(0)
@@ -448,6 +453,7 @@ function App() {
     preserveAlertSound = false,
     preserveRunningSound = false
   ) => {
+    webAudioGenerationRef.current += 1
     if (!preserveAlertSound) {
       audioGenerationRef.current += 1
     }
@@ -579,11 +585,14 @@ function App() {
   }
 
   const playBeep = async () => {
+    const generation = webAudioGenerationRef.current
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
       }
       await resumeAudioContext()
+      if (generation !== webAudioGenerationRef.current) return
+
       const audioContext = audioContextRef.current
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
@@ -595,8 +604,8 @@ function App() {
       oscillator.type = 'sine'
       gainNode.gain.value = 0.3
 
-      oscillator.start()
       beepSourceRef.current = oscillator
+      oscillator.start()
       oscillator.addEventListener('ended', () => {
         if (beepSourceRef.current === oscillator) {
           beepSourceRef.current = null
@@ -791,7 +800,15 @@ function App() {
       }
       const embeddedStrategyStages = [...stage.embeddedStrategyStages]
       embeddedStrategyStages.splice(childIndex + 1, 0, duplicatedStage)
-      return { ...stage, embeddedStrategyStages }
+      const totalDurationMs = embeddedStrategyStages.reduce(
+        (total, childStage) => total + convertToMilliseconds(childStage.duration, childStage.unit),
+        0
+      )
+      return {
+        ...stage,
+        duration: totalDurationMs / TIME_UNITS.minutes,
+        embeddedStrategyStages,
+      }
     }))
     toast.success('子阶段已复制')
   }
@@ -859,6 +876,7 @@ function App() {
         ...sortedSelectedStages[sortedSelectedStages.length - 1].endSettings,
       },
       isMerged: true,
+      embeddedStrategyStages: sortedSelectedStages,
     }
 
     const firstSelectedIndex = stages.indexOf(sortedSelectedStages[0])
@@ -1122,7 +1140,6 @@ function App() {
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
-                      disabled={isMerged}
                       className="flex-1 min-w-0 h-9"
                       placeholder="Stage name"
                     />
@@ -1155,7 +1172,7 @@ function App() {
                   </div>
                   
                   {isMerged && (
-                    <div className="pl-7 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="pl-7 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <Badge variant="secondary" className="text-xs">
                           {isEmbedded ? '嵌入策略' : '合并阶段'}
@@ -1163,7 +1180,7 @@ function App() {
                         <span className="text-muted-foreground">
                           {stage.duration} {getTimeUnitLabel(stage.unit)}
                         </span>
-                        {isEmbedded && stage.embeddedStrategyStages && (
+                        {stage.embeddedStrategyStages?.length ? (
                           <div className="w-full space-y-2">
                             <span className="text-muted-foreground">
                               · {stage.embeddedStrategyStages.length} 个子阶段
@@ -1210,8 +1227,13 @@ function App() {
                                     <div className="flex items-center gap-2 flex-1">
                                       <Input
                                         type="number"
-                                        value={childStage.duration}
-                                        onChange={(event) => updateEmbeddedStage(stage.id, childStage.id, { duration: Math.max(0.001, parseFloat(event.target.value) || 0.001) })}
+                                        value={childStage.duration || ''}
+                                        onChange={(event) => updateEmbeddedStage(stage.id, childStage.id, { duration: event.target.value === '' ? 0 : Math.max(0.001, parseFloat(event.target.value) || 0.001) })}
+                                        onBlur={() => {
+                                          if (!childStage.duration) {
+                                            updateEmbeddedStage(stage.id, childStage.id, { duration: 1 })
+                                          }
+                                        }}
                                         onClick={(event) => event.stopPropagation()}
                                         className="h-8 w-20 text-sm"
                                         step="0.1"
@@ -1220,7 +1242,7 @@ function App() {
                                         value={childStage.unit}
                                         onValueChange={(value: TimeUnit) => updateEmbeddedStage(stage.id, childStage.id, { unit: value })}
                                       >
-                                        <SelectTrigger className="h-8 w-24 text-sm">
+                                        <SelectTrigger className="h-8 w-24 text-sm" onClick={(event) => event.stopPropagation()}>
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1232,7 +1254,7 @@ function App() {
                                         </SelectContent>
                                       </Select>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2" onClick={(event) => event.stopPropagation()}>
                                       <StageViewDialog stage={childStage}>
                                         <Button variant="outline" size="sm" className="h-8 text-xs">
                                           <Eye size={14} className="mr-1.5" />
@@ -1254,11 +1276,11 @@ function App() {
                               ))}
                             </div>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                       {!isEmbedded && (
                         <StageViewDialog stage={stage}>
-                          <Button variant="outline" size="sm" className="h-8 text-xs">
+                          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={(event) => event.stopPropagation()}>
                             <Eye size={14} className="mr-1.5" />
                             查看
                           </Button>
@@ -1268,18 +1290,24 @@ function App() {
                   )}
                   
                   {!isMerged && (
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pl-7" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pl-7">
                       <div className="flex items-center gap-2 flex-1">
                         <Input
                           type="number"
-                          value={stage.duration}
-                          onChange={(e) => updateStage(stage.id, { duration: Math.max(0.001, parseFloat(e.target.value) || 0.001) })}
+                          value={stage.duration || ''}
+                          onChange={(e) => updateStage(stage.id, { duration: e.target.value === '' ? 0 : Math.max(0.001, parseFloat(e.target.value) || 0.001) })}
+                          onBlur={() => {
+                            if (!stage.duration) {
+                              updateStage(stage.id, { duration: 1 })
+                            }
+                          }}
+                            onClick={(e) => e.stopPropagation()}
                           className="w-20 h-8 text-sm"
                           placeholder="时长"
                           step="0.1"
                         />
                         <Select value={stage.unit} onValueChange={(value: TimeUnit) => updateStage(stage.id, { unit: value })}>
-                          <SelectTrigger className="w-24 h-8 text-sm">
+                          <SelectTrigger className="w-24 h-8 text-sm" onClick={(e) => e.stopPropagation()}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1291,7 +1319,7 @@ function App() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <StageViewDialog stage={stage}>
                           <Button variant="outline" size="sm" className="h-8 text-xs flex-1 sm:flex-initial">
                             <Eye size={14} className="mr-1.5" />
@@ -1330,59 +1358,6 @@ function App() {
             </Button>
           </div>
         )}
-
-        <Card className="p-4 md:p-5 space-y-3">
-          <h3 className="text-lg font-semibold">全局设置</h3>
-          <p className="text-xs text-muted-foreground">
-            视觉提醒、点击确认与震动暂未开放，当前仅支持听觉提示。
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 opacity-50">
-              <label className="text-sm font-medium">阶段切换提醒</label>
-              <Switch
-                disabled
-                checked={settings?.showFullscreenAlert ?? true}
-                onCheckedChange={(checked) => setSettings((s) => ({ 
-                  showFullscreenAlert: checked,
-                  forceAcknowledge: s?.forceAcknowledge ?? false,
-                  wallpaperMode: s?.wallpaperMode ?? 'random',
-                  selectedWallpaper: s?.selectedWallpaper,
-                  enableVibration: s?.enableVibration ?? true,
-                  muteAudio: s?.muteAudio ?? false,
-                }))}
-              />
-            </div>
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30 opacity-50">
-              <label className="text-sm font-medium">强制确认</label>
-              <Switch
-                disabled
-                checked={settings?.forceAcknowledge ?? false}
-                onCheckedChange={(checked) => setSettings((s) => ({ 
-                  showFullscreenAlert: s?.showFullscreenAlert ?? true,
-                  forceAcknowledge: checked,
-                  wallpaperMode: s?.wallpaperMode ?? 'random',
-                  selectedWallpaper: s?.selectedWallpaper,
-                  enableVibration: s?.enableVibration ?? true,
-                  muteAudio: s?.muteAudio ?? false,
-                }))}
-              />
-            </div>
-            <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-              <label className="text-sm font-medium">静音</label>
-              <Switch
-                checked={settings?.muteAudio ?? false}
-                onCheckedChange={(checked) => setSettings((s) => ({
-                  showFullscreenAlert: s?.showFullscreenAlert ?? true,
-                  forceAcknowledge: s?.forceAcknowledge ?? false,
-                  wallpaperMode: s?.wallpaperMode ?? 'random',
-                  selectedWallpaper: s?.selectedWallpaper,
-                  enableVibration: s?.enableVibration ?? true,
-                  muteAudio: checked,
-                }))}
-              />
-            </div>
-          </div>
-        </Card>
 
       </div>
 

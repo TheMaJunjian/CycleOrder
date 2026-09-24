@@ -271,7 +271,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   <Label>随机壁纸</Label>
                   <Switch
                     disabled
-                    checked={runningSettings.wallpaperMode === 'random'}
+                    checked={false}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         runningSettings: {
@@ -537,7 +537,7 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                   <Label>随机壁纸</Label>
                   <Switch
                     disabled
-                    checked={endSettings.wallpaperMode === 'random'}
+                    checked={false}
                     onCheckedChange={(checked) =>
                       onUpdate({
                         endSettings: {

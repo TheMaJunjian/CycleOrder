@@ -12,6 +12,8 @@ interface StageViewDialogProps {
 }
 
 export function StageViewDialog({ stage, children }: StageViewDialogProps) {
+  const hasChildStages = Boolean(stage.embeddedStrategyStages?.length)
+
   const runningSettings = stage.runningSettings || {
     randomSound: false,
     wallpaperMode: 'random' as const,
@@ -65,9 +67,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                   <Badge variant="secondary">
                     {stage.isEmbeddedStrategy ? '嵌入策略' : '合并阶段'}
                   </Badge>
-                  {stage.isEmbeddedStrategy && stage.embeddedStrategyStages && (
+                  {hasChildStages && (
                     <span className="text-xs text-muted-foreground ml-2">
-                      包含 {stage.embeddedStrategyStages.length} 个子阶段
+                      包含 {stage.embeddedStrategyStages?.length} 个子阶段
                     </span>
                   )}
                 </div>
@@ -75,9 +77,11 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
             </div>
           </div>
 
-          {stage.isEmbeddedStrategy && stage.embeddedStrategyStages && (
+          {hasChildStages && stage.embeddedStrategyStages && (
             <div>
-              <h3 className="text-sm font-semibold mb-2">嵌入的子阶段</h3>
+              <h3 className="text-sm font-semibold mb-2">
+                {stage.isEmbeddedStrategy ? '嵌入的子阶段' : '合并的阶段'}
+              </h3>
               <div className="space-y-2">
                 {stage.embeddedStrategyStages.map((subStage, index) => (
                   <div key={subStage.id} className="p-3 bg-muted/20 rounded-md text-sm">
@@ -102,7 +106,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
             </div>
           )}
 
-          {!stage.isEmbeddedStrategy && (
+          {!stage.isEmbeddedStrategy && !hasChildStages && (
             <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="running">
               <AccordionTrigger className="text-base font-semibold">
@@ -132,42 +136,27 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Image className="text-primary mt-1" size={20} />
+                  <div className="flex items-start gap-3 opacity-50">
+                    <Image className="text-muted-foreground mt-1" size={20} />
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">壁纸</h4>
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">随机壁纸:</span>
-                          {runningSettings.wallpaperMode === 'random' ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
+                          <span className="text-muted-foreground">暂未开放</span>
                         </div>
-                        {runningSettings.wallpaperMode === 'fixed' && runningSettings.wallpaper && (
-                          <div className="text-xs text-muted-foreground">
-                            文件: {runningSettings.wallpaper.includes('|||') 
-                              ? runningSettings.wallpaper.split('|||')[0] 
-                              : '已上传'}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Vibrate className="text-primary mt-1" size={20} />
+                  <div className="flex items-start gap-3 opacity-50">
+                    <Vibrate className="text-muted-foreground mt-1" size={20} />
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">震动</h4>
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">启用震动:</span>
-                          {runningSettings.enableVibration ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
+                          <span className="text-muted-foreground">暂未开放</span>
                         </div>
                       </div>
                     </div>
@@ -217,42 +206,27 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Image className="text-primary mt-1" size={20} />
+                  <div className="flex items-start gap-3 opacity-50">
+                    <Image className="text-muted-foreground mt-1" size={20} />
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">壁纸</h4>
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">随机壁纸:</span>
-                          {endSettings.wallpaperMode === 'random' ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
+                          <span className="text-muted-foreground">暂未开放</span>
                         </div>
-                        {endSettings.wallpaperMode === 'fixed' && endSettings.wallpaper && (
-                          <div className="text-xs text-muted-foreground">
-                            文件: {endSettings.wallpaper.includes('|||') 
-                              ? endSettings.wallpaper.split('|||')[0] 
-                              : '已上传'}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <Vibrate className="text-primary mt-1" size={20} />
+                  <div className="flex items-start gap-3 opacity-50">
+                    <Vibrate className="text-muted-foreground mt-1" size={20} />
                     <div className="flex-1">
                       <h4 className="font-medium text-sm">震动</h4>
                       <div className="mt-2 space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">启用震动:</span>
-                          {endSettings.enableVibration ? (
-                            <Check className="text-green-600" size={20} />
-                          ) : (
-                            <X className="text-muted-foreground" size={20} />
-                          )}
+                          <span className="text-muted-foreground">暂未开放</span>
                         </div>
                       </div>
                     </div>
