@@ -66,16 +66,12 @@ function App() {
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
-  const customSoundRef = useRef<HTMLAudioElement | null>(null)
-  const customSoundReferenceRef = useRef<string | null>(null)
-  const alertSoundRef = useRef<HTMLAudioElement | null>(null)
-  const endSoundRef = useRef<HTMLAudioElement | null>(null)
+  const stageSoundRef = useRef<HTMLAudioElement | null>(null)
+  const stageSoundReferenceRef = useRef<string | null>(null)
   const beepSourceRef = useRef<OscillatorNode | null>(null)
-  const audioGenerationRef = useRef(0)
-  const endSoundGenerationRef = useRef(0)
+  const stageSoundGenerationRef = useRef(0)
   const webAudioGenerationRef = useRef(0)
-  const isAlertPlayingRef = useRef(false)
-  const isOutsideAlertPlayingRef = useRef(false)
+  const isStageEndSoundPlayingRef = useRef(false)
   const prevStageIndexRef = useRef<string>('')
   const hasRecoveredTimerRef = useRef(false)
   const recoverAudioOnFocusRef = useRef<() => void>(() => {})
@@ -224,10 +220,10 @@ function App() {
     shouldContinueLoop,
     setLoop,
     setTimerState,
-    stopAllEffects: (_preserveEndSound?: boolean, _preserveAlertSound?: boolean, _preserveRunningSound?: boolean) => {},
-    stopAlertSound: () => {},
+    stopAllEffects: (_preserveStageSound?: boolean) => {},
+    stopStageEndSound: () => {},
     playStageRunningEffects: (_stage: Stage) => {},
-    playAlertSound: (_stage: Stage) => {},
+    playStageEndSound: (_stage: Stage) => {},
     handleStageComplete: (_stage: Stage) => {},
   })
 
@@ -240,19 +236,18 @@ function App() {
       prevStageIndexRef.current = stagePathKey
       
       if (currentStage && stageChanged) {
-        const preserveOutsideAlert = isOutsideAlertPlayingRef.current
-        const runningSound = currentStage.runningSettings
-        const preserveRunningSound = Boolean(
-          !preserveOutsideAlert &&
-          !settings.muteAudio &&
-          !runningSound.randomSound &&
-          runningSound.soundFile &&
-          !isMissingAudioReference(runningSound.soundFile) &&
-          runningSound.soundFile === customSoundReferenceRef.current
+        const nextSoundReference = !settings.muteAudio &&
+          !currentStage.runningSettings.randomSound &&
+          currentStage.runningSettings.soundFile &&
+          !isMissingAudioReference(currentStage.runningSettings.soundFile)
+          ? currentStage.runningSettings.soundFile
+          : null
+        const preserveStageSound = Boolean(
+          nextSoundReference && stageSoundReferenceRef.current === nextSoundReference
         )
-        timerEffectCallbacksRef.current.stopAllEffects(true, preserveOutsideAlert, preserveRunningSound)
-        if (preserveOutsideAlert) {
-          isOutsideAlertPlayingRef.current = false
+        timerEffectCallbacksRef.current.stopAllEffects(preserveStageSound)
+        if (preserveStageSound) {
+          isStageEndSoundPlayingRef.current = false
         } else {
           timerEffectCallbacksRef.current.playStageRunningEffects(currentStage)
         }
@@ -275,16 +270,16 @@ function App() {
           const alertTiming = currentStage.endSettings?.alertTiming ?? 'inside'
           const alertTimeMs = convertToMilliseconds(alertTime, alertTimeUnit)
           
-          if (alertTime !== 0 && !isAlertPlayingRef.current) {
+          if (alertTime !== 0 && !isStageEndSoundPlayingRef.current) {
             if (alertTiming === 'inside') {
               const timeUntilEnd = stageDuration - newElapsed
               if (timeUntilEnd <= alertTimeMs && timeUntilEnd > 0) {
-                timerEffectCallbacksRef.current.playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.playStageEndSound(currentStage)
               }
             } else {
               const alertStartTime = stageDuration
               if (newElapsed >= alertStartTime && prev.currentStageElapsed < alertStartTime) {
-                timerEffectCallbacksRef.current.playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.playStageEndSound(currentStage)
               }
             }
           }
@@ -335,9 +330,7 @@ function App() {
             
             if (currentStage.endSettings?.alertTime && currentStage.endSettings.alertTiming === 'outside') {
               if ((currentStage.endSettings.soundFile && !isMissingAudioReference(currentStage.endSettings.soundFile)) || currentStage.endSettings.randomSound) {
-                isOutsideAlertPlayingRef.current = true
-                timerEffectCallbacksRef.current.stopAllEffects()
-                timerEffectCallbacksRef.current.playAlertSound(currentStage)
+                timerEffectCallbacksRef.current.playStageEndSound(currentStage)
               }
             }
             
@@ -365,7 +358,7 @@ function App() {
       }
       if (!timerState.isRunning) {
         timerEffectCallbacksRef.current.stopAllEffects()
-        timerEffectCallbacksRef.current.stopAlertSound()
+        timerEffectCallbacksRef.current.stopStageEndSound()
         prevStageIndexRef.current = ''
       }
     }
@@ -380,10 +373,8 @@ function App() {
   const playStageRunningEffects = (stage: Stage) => {
     if (!stage.runningSettings) return
 
-    stopAlertSound()
-
     if (!settings?.muteAudio && stage.runningSettings.soundFile && !isMissingAudioReference(stage.runningSettings.soundFile) && !stage.runningSettings.randomSound) {
-      playCustomSound(stage.runningSettings.soundFile)
+      playStageSound(stage.runningSettings.soundFile, 0.3, false)
     } else if (!settings?.muteAudio && stage.runningSettings.randomSound) {
       playBackgroundNoise()
     }
@@ -399,10 +390,8 @@ function App() {
   const retryActiveAudio = () => {
     if (settings?.muteAudio) return
 
-    for (const audio of [customSoundRef.current, alertSoundRef.current, endSoundRef.current]) {
-      if (audio && audio.paused) {
-        void audio.play().catch(() => {})
-      }
+    if (stageSoundRef.current?.paused) {
+      void stageSoundRef.current.play().catch(() => {})
     }
   }
 
@@ -431,37 +420,45 @@ function App() {
     }
   }
 
-  const playCustomSound = async (soundReference: string) => {
-    if (customSoundReferenceRef.current === soundReference && customSoundRef.current) {
-      if (customSoundRef.current.paused) {
-        void customSoundRef.current.play().catch((e) => console.error('Failed to resume custom sound', e))
+  const playStageSound = async (soundReference: string, volume: number, isStageEndSound: boolean) => {
+    if (stageSoundReferenceRef.current === soundReference) {
+      if (stageSoundRef.current) {
+        stageSoundRef.current.volume = volume
       }
+      if (stageSoundRef.current?.paused) {
+        void stageSoundRef.current.play().catch((e) => console.error('Failed to resume stage sound', e))
+      }
+      isStageEndSoundPlayingRef.current = isStageEndSound
       return
     }
 
-    const generation = audioGenerationRef.current
+    const generation = ++stageSoundGenerationRef.current
     try {
-      if (customSoundRef.current) {
-        customSoundRef.current.pause()
-        revokeAudioSource(customSoundRef.current)
-        customSoundRef.current = null
-        customSoundReferenceRef.current = null
+      if (stageSoundRef.current) {
+        stageSoundRef.current.pause()
+        revokeAudioSource(stageSoundRef.current)
+        stageSoundRef.current = null
       }
+      stageSoundReferenceRef.current = soundReference
+      isStageEndSoundPlayingRef.current = isStageEndSound
 
       const actualDataUrl = await resolveAudioSource(soundReference)
-      if (generation !== audioGenerationRef.current) {
+      if (generation !== stageSoundGenerationRef.current) {
         if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
         return
       }
 
       const audio = new Audio(actualDataUrl)
       audio.loop = true
-      audio.volume = 0.3
-      customSoundRef.current = audio
-      customSoundReferenceRef.current = soundReference
-      audio.play().catch((e) => console.error('Failed to play custom sound', e))
+      audio.volume = volume
+      stageSoundRef.current = audio
+      audio.play().catch((e) => console.error('Failed to play stage sound', e))
     } catch (e) {
-      console.error('Failed to load custom sound', e)
+      if (generation === stageSoundGenerationRef.current) {
+        stageSoundReferenceRef.current = null
+        isStageEndSoundPlayingRef.current = false
+      }
+      console.error('Failed to load stage sound', e)
     }
   }
 
@@ -497,38 +494,26 @@ function App() {
     }
   }
 
-  const stopAllEffects = (
-    preserveEndSound = false,
-    preserveAlertSound = false,
-    preserveRunningSound = false
-  ) => {
-    webAudioGenerationRef.current += 1
-    if (!preserveAlertSound) {
-      audioGenerationRef.current += 1
+  const stopStageSound = () => {
+    stageSoundGenerationRef.current += 1
+    if (stageSoundRef.current) {
+      stageSoundRef.current.pause()
+      stageSoundRef.current.currentTime = 0
+      revokeAudioSource(stageSoundRef.current)
+      stageSoundRef.current = null
     }
+    stageSoundReferenceRef.current = null
+    isStageEndSoundPlayingRef.current = false
+  }
+
+  const stopAllEffects = (preserveStageSound = false) => {
+    webAudioGenerationRef.current += 1
     if (noiseSourceRef.current) {
       noiseSourceRef.current.stop()
       noiseSourceRef.current = null
     }
-    if (!preserveRunningSound && customSoundRef.current) {
-      customSoundRef.current.pause()
-      revokeAudioSource(customSoundRef.current)
-      customSoundRef.current = null
-      customSoundReferenceRef.current = null
-    }
-    if (!preserveAlertSound && alertSoundRef.current) {
-      alertSoundRef.current.pause()
-      revokeAudioSource(alertSoundRef.current)
-      alertSoundRef.current = null
-    }
-    if (!preserveEndSound) {
-      endSoundGenerationRef.current += 1
-    }
-    if (!preserveEndSound && endSoundRef.current) {
-      endSoundRef.current.pause()
-      endSoundRef.current.currentTime = 0
-      revokeAudioSource(endSoundRef.current)
-      endSoundRef.current = null
+    if (!preserveStageSound) {
+      stopStageSound()
     }
     if (beepSourceRef.current) {
       try {
@@ -538,12 +523,9 @@ function App() {
       }
       beepSourceRef.current = null
     }
-    if (!preserveAlertSound) {
-      isAlertPlayingRef.current = false
-    }
   }
 
-  const playAlertSound = async (stage: Stage) => {
+  const playStageEndSound = async (stage: Stage) => {
     if (!stage.endSettings || !stage.endSettings.alertTime || stage.endSettings.alertTime === 0) {
       return
     }
@@ -552,42 +534,28 @@ function App() {
       return
     }
 
-    if (isAlertPlayingRef.current) {
-      return
-    }
-
-    const generation = audioGenerationRef.current
-
     if (stage.endSettings.soundFile && !isMissingAudioReference(stage.endSettings.soundFile) && !stage.endSettings.randomSound) {
-      try {
-        const actualDataUrl = await resolveAudioSource(stage.endSettings.soundFile)
-        if (generation !== audioGenerationRef.current) {
-          if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
-          return
-        }
-
-        const audio = new Audio(actualDataUrl)
-        audio.loop = true
-        audio.volume = 0.5
-        alertSoundRef.current = audio
-        isAlertPlayingRef.current = true
-        audio.play().catch((e) => console.error('Failed to play alert sound', e))
-      } catch (e) {
-        console.error('Failed to load alert sound', e)
-      }
+      await playStageSound(stage.endSettings.soundFile, 0.5, true)
     } else if (stage.endSettings.randomSound) {
-      playBeep()
-      isAlertPlayingRef.current = true
+      if (isStageEndSoundPlayingRef.current) return
+      stopStageSound()
+      isStageEndSoundPlayingRef.current = true
+      void playBeep()
     }
   }
 
-  const stopAlertSound = () => {
-    if (alertSoundRef.current) {
-      alertSoundRef.current.pause()
-      alertSoundRef.current.currentTime = 0
-      alertSoundRef.current = null
+  const stopStageEndSound = () => {
+    if (!isStageEndSoundPlayingRef.current) return
+    stopStageSound()
+    webAudioGenerationRef.current += 1
+    if (beepSourceRef.current) {
+      try {
+        beepSourceRef.current.stop()
+      } catch (error) {
+        console.error('[audio] Failed to stop beep', error)
+      }
+      beepSourceRef.current = null
     }
-    isAlertPlayingRef.current = false
   }
 
   const handleStageComplete = (stage: Stage) => {
@@ -595,16 +563,15 @@ function App() {
       noiseSourceRef.current.stop()
       noiseSourceRef.current = null
     }
-    stopAlertSound()
-
     const alertTime = stage.endSettings?.alertTime ?? 0
 
-    if (!settings?.muteAudio && stage.endSettings && alertTime !== 0) {
-      if (stage.endSettings.soundFile && !stage.endSettings.randomSound) {
-        playEndSound(stage.endSettings.soundFile)
-      } else if (stage.endSettings.randomSound) {
-        playBeep()
-      }
+    if (
+      !settings?.muteAudio &&
+      stage.endSettings &&
+      alertTime !== 0 &&
+      stage.endSettings.alertTiming !== 'outside'
+    ) {
+      void playStageEndSound(stage)
     }
 
   }
@@ -618,34 +585,10 @@ function App() {
     setLoop,
     setTimerState,
     stopAllEffects,
-    stopAlertSound,
+    stopStageEndSound,
     playStageRunningEffects,
-    playAlertSound,
+    playStageEndSound,
     handleStageComplete,
-  }
-
-  const playEndSound = async (soundReference: string) => {
-    const generation = endSoundGenerationRef.current
-    try {
-      const actualDataUrl = await resolveAudioSource(soundReference)
-      if (generation !== endSoundGenerationRef.current) {
-        if (actualDataUrl.startsWith('blob:')) URL.revokeObjectURL(actualDataUrl)
-        return
-      }
-
-      const audio = new Audio(actualDataUrl)
-      audio.loop = true
-      audio.volume = 0.5
-      endSoundRef.current = audio
-      audio.play().catch((e) => console.error('Failed to play end sound', e))
-      audio.addEventListener('ended', () => {
-        if (endSoundRef.current === audio) {
-          endSoundRef.current = null
-        }
-      }, { once: true })
-    } catch (e) {
-      console.error('Failed to load end sound', e)
-    }
   }
 
   const playBeep = async () => {
@@ -717,7 +660,7 @@ function App() {
           timeUntilEnd <= alertTimeMs &&
           timeUntilEnd > 0
         ) {
-          playAlertSound(stage)
+          playStageEndSound(stage)
         }
       }
     }
@@ -727,7 +670,7 @@ function App() {
   const handleSkip = () => {
     if (!stages) return
     stopAllEffects()
-    stopAlertSound()
+    stopStageEndSound()
     setTimerState((prev) => {
       const activePath = getFirstLeafPath(stages, prev.currentStageIndex)
       const nextPath = getNextStagePath(stages, activePath) || getInitialStagePath(stages)
@@ -741,7 +684,7 @@ function App() {
 
   const handleReset = () => {
     stopAllEffects()
-    stopAlertSound()
+    stopStageEndSound()
     prevStageIndexRef.current = ''
     setTimerState({
       isRunning: false,
@@ -993,7 +936,7 @@ function App() {
 
   const handleRunStrategy = (strategy: Strategy) => {
     stopAllEffects()
-    stopAlertSound()
+    stopStageEndSound()
     prevStageIndexRef.current = ''
     setStages(() => strategy.stages)
     setLoop(() => strategy.loop)
