@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Stage, TimeUnit, AlertTiming } from '@/types'
+import { Stage, TimeUnit, AlertTiming, SOUND_CATEGORIES, SoundCategory } from '@/types'
 import { createAudioReference, getAudioDisplayName, listLocalAudio, saveLocalAudio, LocalAudioFile } from '@/lib/audio-storage'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -90,6 +90,14 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
       setEndAudioSelectOpen(false)
     }
     toast.success(`已选择上传音频：${audio.name}`)
+  }
+
+  const updateSoundCategory = (type: 'running' | 'end', category: SoundCategory) => {
+    if (type === 'running') {
+      onUpdate({ runningSettings: { ...runningSettings, soundCategory: category } })
+    } else {
+      onUpdate({ endSettings: { ...endSettings, soundCategory: category } })
+    }
   }
 
   const handleFileUpload = (
@@ -198,6 +206,23 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     }
                   />
                 </div>
+
+                {runningSettings.randomSound && (
+                  <div className="space-y-2">
+                    <Label>随机音效类型</Label>
+                    <Select
+                      value={runningSettings.soundCategory ?? 'wind'}
+                      onValueChange={(category) => updateSoundCategory('running', category as SoundCategory)}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SOUND_CATEGORIES.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {!runningSettings.randomSound && (
                   <div className="space-y-2">
@@ -462,6 +487,23 @@ export function StageSettingsDialog({ stage, onUpdate, children }: StageSettings
                     }
                   />
                 </div>
+
+                {endSettings.randomSound && (
+                  <div className="space-y-2">
+                    <Label>随机音效类型</Label>
+                    <Select
+                      value={endSettings.soundCategory ?? 'wind'}
+                      onValueChange={(category) => updateSoundCategory('end', category as SoundCategory)}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SOUND_CATEGORIES.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {!endSettings.randomSound && (
                   <div className="space-y-2">

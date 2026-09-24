@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState } from '@/types'
+import { Stage, Loop, Settings, TimerState, TimeUnit, LoopMode, StrategyLoadMode, Strategy, AppState, SOUND_CATEGORIES, SoundCategory } from '@/types'
 import { convertToMilliseconds, formatTime, generateId, TIME_UNITS } from '@/lib/timer-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { StageSettingsDialog } from '@/components/StageSettingsDialog'
 import { StageViewDialog } from '@/components/StageViewDialog'
 import { LoopSettingsDialog } from '@/components/LoopSettingsDialog'
-import { getAudioReferenceId, getLocalAudioBlob, isMissingAudioReference } from '@/lib/audio-storage'
+import { getAudioDisplayName, getAudioReferenceId, getLocalAudioBlob, isMissingAudioReference } from '@/lib/audio-storage'
 import { useLocalStorage } from '@/hooks/use-local-storage'
 
 const StrategyManagementDialog = lazy(() =>
@@ -63,14 +63,20 @@ function App() {
 
   const [selectedStageIds, setSelectedStageIds] = useState<Set<string>>(new Set())
   const [strategyDialogOpen, setStrategyDialogOpen] = useState(false)
+  const [missingCurrentSoundReference, setMissingCurrentSoundReference] = useState<string | null>(null)
+  const [activeSoundPlayers, setActiveSoundPlayers] = useState<{ id: string; label: string }[]>([])
   const intervalRef = useRef<number | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null)
+  const noiseCategoryRef = useRef<SoundCategory>('wind')
   const sharedSoundRef = useRef<HTMLAudioElement | null>(null)
   const sharedSoundReferenceRef = useRef<string | null>(null)
   const sharedSoundGenerationRef = useRef(0)
   const sharedSoundKindRef = useRef<'file' | 'noise' | 'beep' | null>(null)
   const outsideAlertSoundsRef = useRef(new Map<number, {
+    playerId: string
+    category: SoundCategory
+    label: string
     audio: HTMLAudioElement | null
     beepKey: string | null
     timeout: number | null
@@ -79,15 +85,28 @@ function App() {
   }>())
   const beepSourcesRef = useRef(new Map<string, AudioBufferSourceNode>())
   const beepGenerationsRef = useRef(new Map<string, number>())
+  const beepCategoriesRef = useRef(new Map<string, SoundCategory>())
+  const beepLabelsRef = useRef(new Map<string, string>())
   const noiseGenerationRef = useRef(0)
   const outsideAlertGenerationRef = useRef(0)
   const outsideAlertSequenceRef = useRef(0)
   const activeAlertStageIdRef = useRef<string | null>(null)
   const isNoiseStartingRef = useRef(false)
   const audioPausedRef = useRef(false)
+  const activeSoundPlayersRef = useRef<{ id: string; label: string }[]>([])
+  const noiseSoundLabelRef = useRef('随机音效-风声')
   const prevStageIndexRef = useRef<string>('')
+  const prevStageSoundKeyRef = useRef('')
   const hasRecoveredTimerRef = useRef(false)
   const recoverAudioOnFocusRef = useRef<() => void>(() => {})
+
+  const updateActiveSoundPlayer = (id: string, label?: string) => {
+    const nextPlayers = label
+      ? [...activeSoundPlayersRef.current.filter((player) => player.id !== id), { id, label }]
+      : activeSoundPlayersRef.current.filter((player) => player.id !== id)
+    activeSoundPlayersRef.current = nextPlayers
+    queueMicrotask(() => setActiveSoundPlayers([...activeSoundPlayersRef.current]))
+  }
 
   useEffect(() => {
     if (hasRecoveredTimerRef.current) return
@@ -193,6 +212,17 @@ function App() {
     return [...prefixes, leafStage?.name || ''].filter(Boolean).join(' / ')
   }
 
+  const getSoundDisplayLabel = (soundSettings: Stage['runningSettings']): string => {
+    const soundName = soundSettings.randomSound
+      ? `随机音效-${SOUND_CATEGORIES.find(({ value }) => value === (soundSettings.soundCategory ?? 'wind'))?.label ?? '风声'}`
+      : soundSettings.soundFile
+        ? isMissingAudioReference(soundSettings.soundFile)
+          ? `缺少音效文件：${getAudioDisplayName(soundSettings.soundFile) || '未知文件'}`
+          : getAudioDisplayName(soundSettings.soundFile) || '已上传音效文件'
+        : '未设置音效'
+    return soundName
+  }
+
   const getInitialStagePath = (stageList: Stage[]): number[] => {
     return getFirstLeafPath(stageList, [0])
   }
@@ -248,8 +278,14 @@ function App() {
       const stagePathKey = runtimeStagePath.join('.')
       const stageChanged = prevStageIndexRef.current !== stagePathKey
       prevStageIndexRef.current = stagePathKey
+
+      const runningSoundKey = currentStage
+        ? `${currentStage.id}:${currentStage.runningSettings?.randomSound}:${currentStage.runningSettings?.soundFile}:${currentStage.runningSettings?.soundCategory}`
+        : ''
+      const soundSettingsChanged = prevStageSoundKeyRef.current !== runningSoundKey
+      prevStageSoundKeyRef.current = runningSoundKey
       
-      if (currentStage && stageChanged) {
+      if (currentStage && (stageChanged || soundSettingsChanged)) {
         timerEffectCallbacksRef.current.playStageRunningEffects(currentStage)
       }
 
@@ -381,19 +417,28 @@ function App() {
       !isMissingAudioReference(stage.runningSettings.soundFile)
       ? stage.runningSettings.soundFile
       : null
+    const soundLabel = getSoundDisplayLabel(stage.runningSettings)
     if (soundReference && sharedSoundReferenceRef.current === soundReference) {
-      void playSharedSound(soundReference, 0.3)
+      void playSharedSound(soundReference, 0.3, soundLabel)
       return
     }
-    if (!soundReference && !settings?.muteAudio && stage.runningSettings.randomSound && sharedSoundKindRef.current === 'noise' && (noiseSourceRef.current || isNoiseStartingRef.current)) {
+    if (
+      !soundReference &&
+      !settings?.muteAudio &&
+      stage.runningSettings.randomSound &&
+      noiseCategoryRef.current === (stage.runningSettings.soundCategory ?? 'wind') &&
+      sharedSoundKindRef.current === 'noise' &&
+      (noiseSourceRef.current || isNoiseStartingRef.current)
+    ) {
+      updateActiveSoundPlayer('shared', soundLabel)
       return
     }
 
     stopStageRunningEffects()
     if (soundReference) {
-      playSharedSound(soundReference, 0.3)
+      playSharedSound(soundReference, 0.3, soundLabel)
     } else if (!settings?.muteAudio && stage.runningSettings.randomSound) {
-      playBackgroundNoise()
+      playBackgroundNoise(stage.runningSettings.soundCategory ?? 'wind', soundLabel)
     }
 
   }
@@ -463,8 +508,9 @@ function App() {
     }
   }
 
-  const playSharedSound = async (soundReference: string, volume: number) => {
+  const playSharedSound = async (soundReference: string, volume: number, label: string) => {
     if (sharedSoundReferenceRef.current === soundReference) {
+      updateActiveSoundPlayer('shared', label)
       if (sharedSoundRef.current) {
         sharedSoundRef.current.volume = volume
         if (sharedSoundRef.current.paused && !audioPausedRef.current) {
@@ -478,6 +524,7 @@ function App() {
     const generation = sharedSoundGenerationRef.current
     sharedSoundReferenceRef.current = soundReference
     sharedSoundKindRef.current = 'file'
+    updateActiveSoundPlayer('shared', label)
     try {
       const actualDataUrl = await resolveAudioSource(soundReference)
       if (generation !== sharedSoundGenerationRef.current) {
@@ -496,6 +543,7 @@ function App() {
       if (generation === sharedSoundGenerationRef.current) {
         sharedSoundReferenceRef.current = null
         sharedSoundKindRef.current = null
+        updateActiveSoundPlayer('shared', `${label}（文件缺失或无法读取）`)
       }
       console.error('Failed to load shared sound', error)
     }
@@ -509,14 +557,22 @@ function App() {
     if (activeAlertStageIdRef.current === stage.id) return
 
     if (soundReference && !isMissingAudioReference(soundReference) && !stage.endSettings.randomSound) {
-      const playback = playSharedSound(soundReference, 0.5)
+      const playback = playSharedSound(
+        soundReference,
+        0.5,
+        getSoundDisplayLabel(stage.endSettings)
+      )
       activeAlertStageIdRef.current = stage.id
       await playback
     } else if (stage.endSettings.randomSound) {
       stopStageRunningEffects()
       sharedSoundKindRef.current = 'beep'
       activeAlertStageIdRef.current = stage.id
-      await playBeep('shared')
+      await playBeep(
+        'shared',
+        stage.endSettings.soundCategory ?? 'wind',
+        getSoundDisplayLabel(stage.endSettings)
+      )
     }
   }
 
@@ -533,6 +589,7 @@ function App() {
       revokeAudioSource(alert.audio)
     }
     if (alert.beepKey) stopBeep(alert.beepKey)
+    updateActiveSoundPlayer(alert.playerId)
   }
 
   const playOutsideAlertSound = async (stage: Stage, durationMs: number) => {
@@ -544,20 +601,27 @@ function App() {
 
     const alertId = ++outsideAlertSequenceRef.current
     const generation = outsideAlertGenerationRef.current
+    const category = endSettings.soundCategory ?? 'wind'
+    const label = getSoundDisplayLabel(endSettings)
+    const playerId = `outside-alert-${alertId}`
     const alert = {
+      playerId,
+      category,
+      label,
       audio: null as HTMLAudioElement | null,
-      beepKey: endSettings.randomSound ? `outside-${alertId}` : null,
+      beepKey: endSettings.randomSound ? playerId : null,
       timeout: null as number | null,
       remainingMs: durationMs,
       deadline: Date.now() + durationMs,
     }
     outsideAlertSoundsRef.current.set(alertId, alert)
+    updateActiveSoundPlayer(playerId, label)
     if (!audioPausedRef.current) {
       alert.timeout = window.setTimeout(() => stopOutsideAlert(alertId), durationMs)
     }
 
     if (endSettings.randomSound) {
-      void playBeep(alert.beepKey!)
+      void playBeep(alert.beepKey!, category, label)
       return
     }
 
@@ -576,16 +640,131 @@ function App() {
         audio.play().catch((error) => console.error('Failed to play outside alert', error))
       }
     } catch (error) {
-      stopOutsideAlert(alertId)
+      if (outsideAlertSoundsRef.current.get(alertId) === alert) {
+        updateActiveSoundPlayer(playerId, `${label}（文件缺失或无法读取）`)
+      }
       console.error('Failed to load outside alert', error)
     }
   }
 
-  const playBackgroundNoise = async () => {
+  const createRandomSoundSource = (audioContext: AudioContext, category: SoundCategory, loop = true) => {
+    const durationSeconds = loop ? 6 : 8 + Math.floor(Math.random() * 5)
+    const sampleRate = audioContext.sampleRate
+    const buffer = audioContext.createBuffer(1, sampleRate * durationSeconds, sampleRate)
+    const samples = buffer.getChannelData(0)
+    let lowFrequencyState = 0
+    let crackle = 0
+    let nextBirdCall = Math.random() * sampleRate
+    let birdCallSamples = 0
+    let birdCallPhase = 0
+    let birdCallFrequency = 0
+    const swellPeriod = 4 + Math.random() * 5
+    const swellPhase = Math.random() * Math.PI * 2
+
+    for (let index = 0; index < samples.length; index += 1) {
+      const whiteNoise = Math.random() * 2 - 1
+      const time = index / sampleRate
+      if (category === 'wind') {
+        const swell = 0.55 + 0.45 * Math.sin((2 * Math.PI * time) / swellPeriod + swellPhase)
+        samples[index] = whiteNoise * swell * 0.3
+      } else if (category === 'thunder') {
+        lowFrequencyState = lowFrequencyState * 0.997 + whiteNoise * 0.018
+        samples[index] = lowFrequencyState * 2.5
+      } else if (category === 'rain') {
+        if (Math.random() < 0.00012) crackle = 0.55
+        samples[index] = whiteNoise * 0.2 + crackle
+        crackle *= 0.998
+      } else if (category === 'fire') {
+        if (Math.random() < 0.0001) crackle = 0.8
+        samples[index] = whiteNoise * 0.05 + crackle
+        crackle *= 0.994
+      } else if (category === 'ocean') {
+        lowFrequencyState = lowFrequencyState * 0.997 + whiteNoise * 0.016
+        const swell = Math.max(0, Math.sin((2 * Math.PI * time) / swellPeriod + swellPhase))
+        samples[index] = lowFrequencyState * (0.4 + swell * 2.2) + whiteNoise * swell * 0.12
+      } else if (category === 'stream') {
+        lowFrequencyState = lowFrequencyState * 0.94 + whiteNoise * 0.06
+        const ripple = 0.82 + 0.18 * Math.sin((2 * Math.PI * time) / (0.7 + swellPeriod / 8) + swellPhase)
+        samples[index] = (whiteNoise * 0.18 + lowFrequencyState * 0.3) * ripple
+      } else if (category === 'forest') {
+        nextBirdCall -= 1
+        if (nextBirdCall <= 0 && birdCallSamples <= 0) {
+          birdCallSamples = Math.floor(sampleRate * (0.08 + Math.random() * 0.14))
+          birdCallFrequency = 1500 + Math.random() * 1100
+          birdCallPhase = 0
+          nextBirdCall = sampleRate * (0.9 + Math.random() * 2.8)
+        }
+        if (birdCallSamples > 0) {
+          const progress = 1 - birdCallSamples / (sampleRate * 0.22)
+          samples[index] = whiteNoise * 0.035 + Math.sin(birdCallPhase) * Math.sin(Math.PI * progress) * 0.13
+          birdCallPhase += (2 * Math.PI * (birdCallFrequency + progress * 350)) / sampleRate
+          birdCallSamples -= 1
+        } else {
+          samples[index] = whiteNoise * 0.035
+        }
+      } else {
+        const chirpCycle = time % 1.4
+        const chirpEnvelope = chirpCycle < 0.18 ? Math.sin((Math.PI * chirpCycle) / 0.18) : 0
+        samples[index] = whiteNoise * 0.025 + Math.sin(2 * Math.PI * 4100 * time) * chirpEnvelope * 0.08
+      }
+
+      if (!loop) {
+        const fadeSamples = Math.floor(sampleRate * 0.18)
+        const fadeIn = Math.min(1, index / fadeSamples)
+        const fadeOut = Math.min(1, (samples.length - index) / fadeSamples)
+        samples[index] *= Math.min(fadeIn, fadeOut)
+      }
+    }
+
+    const filter = audioContext.createBiquadFilter()
+    filter.type = category === 'wind' || category === 'thunder' || category === 'ocean' ? 'lowpass' : 'bandpass'
+    filter.frequency.value = category === 'wind' ? 650
+      : category === 'thunder' ? 220
+        : category === 'rain' ? 2400
+          : category === 'fire' ? 1100
+            : category === 'ocean' ? 900
+              : category === 'stream' ? 1700
+                : category === 'forest' ? 3200
+                  : 4100
+    filter.frequency.value *= 0.85 + Math.random() * 0.3
+    filter.Q.value = category === 'fire' || category === 'night' ? 0.7 : 0.5
+
+    const volume = audioContext.createGain()
+    volume.gain.value = category === 'thunder' ? 0.18
+      : category === 'forest' || category === 'night' ? 0.14
+        : 0.2
+    volume.gain.value *= 0.9 + Math.random() * 0.2
+    const source = audioContext.createBufferSource()
+    source.buffer = buffer
+    source.loop = loop
+    source.connect(filter)
+    filter.connect(volume)
+    volume.connect(audioContext.destination)
+    return source
+  }
+
+  const startBackgroundNoiseSegment = (audioContext: AudioContext, category: SoundCategory, generation: number) => {
+    if (generation !== noiseGenerationRef.current || audioPausedRef.current) return
+
+    const source = createRandomSoundSource(audioContext, category, false)
+    source.addEventListener('ended', () => {
+      if (noiseSourceRef.current === source) noiseSourceRef.current = null
+      startBackgroundNoiseSegment(audioContext, category, generation)
+    }, { once: true })
+    source.start()
+    noiseSourceRef.current = source
+  }
+
+  const playBackgroundNoise = async (
+    category: SoundCategory = 'wind',
+    label: string = noiseSoundLabelRef.current
+  ) => {
     if (!settings || settings.muteAudio) return
     if (noiseSourceRef.current || isNoiseStartingRef.current) return
 
     const generation = noiseGenerationRef.current
+    noiseCategoryRef.current = category
+    noiseSoundLabelRef.current = label
     sharedSoundKindRef.current = 'noise'
     isNoiseStartingRef.current = true
     try {
@@ -600,20 +779,8 @@ function App() {
         return
       }
 
-      const bufferSize = audioContext.sampleRate * 2
-      const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate)
-      const data = buffer.getChannelData(0)
-
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * 0.05
-      }
-
-      const source = audioContext.createBufferSource()
-      source.buffer = buffer
-      source.loop = true
-      source.connect(audioContext.destination)
-      source.start()
-      noiseSourceRef.current = source
+      startBackgroundNoiseSegment(audioContext, category, generation)
+      updateActiveSoundPlayer('shared', label)
       isNoiseStartingRef.current = false
     } catch (e) {
       if (generation === noiseGenerationRef.current) isNoiseStartingRef.current = false
@@ -661,10 +828,14 @@ function App() {
       void sharedSoundRef.current.play().catch((error) => console.error('Failed to resume shared sound', error))
     }
     if (!noiseSourceRef.current && sharedSoundKindRef.current === 'noise') {
-      void playBackgroundNoise()
+      void playBackgroundNoise(noiseCategoryRef.current, noiseSoundLabelRef.current)
     }
     if (sharedSoundKindRef.current === 'beep' && !beepSourcesRef.current.has('shared')) {
-      void playBeep('shared')
+      void playBeep(
+        'shared',
+        beepCategoriesRef.current.get('shared') ?? 'wind',
+        beepLabelsRef.current.get('shared') ?? '随机音效-风声'
+      )
     }
     if (audioContextRef.current?.state === 'suspended') {
       void resumeAudioContext().catch((error) => console.error('Failed to resume audio context', error))
@@ -681,7 +852,7 @@ function App() {
       alert.deadline = Date.now() + alert.remainingMs
       alert.timeout = window.setTimeout(() => stopOutsideAlert(alertId), alert.remainingMs)
       if (alert.beepKey && !beepSourcesRef.current.has(alert.beepKey)) {
-        void playBeep(alert.beepKey)
+        void playBeep(alert.beepKey, alert.category, alert.label)
       }
     }
   }
@@ -724,18 +895,25 @@ function App() {
     const currentGeneration = beepGenerationsRef.current.get(key) ?? 0
     beepGenerationsRef.current.set(key, currentGeneration + 1)
     const source = beepSourcesRef.current.get(key)
-    if (!source) return
-    try {
-      source.stop()
-    } catch (error) {
-      console.error('[audio] Failed to stop beep', error)
+    if (source) {
+      try {
+        source.stop()
+      } catch (error) {
+        console.error('[audio] Failed to stop beep', error)
+      }
     }
     beepSourcesRef.current.delete(key)
+    beepCategoriesRef.current.delete(key)
+    beepLabelsRef.current.delete(key)
+    updateActiveSoundPlayer(key)
   }
 
-  const playBeep = async (key: string) => {
+  const playBeep = async (key: string, category: SoundCategory = 'wind', label = '随机音效-风声') => {
     const generation = (beepGenerationsRef.current.get(key) ?? 0) + 1
     beepGenerationsRef.current.set(key, generation)
+    beepCategoriesRef.current.set(key, category)
+    beepLabelsRef.current.set(key, label)
+    updateActiveSoundPlayer(key, label)
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext()
@@ -743,19 +921,7 @@ function App() {
       await resumeAudioContext()
       if (generation !== beepGenerationsRef.current.get(key) || audioPausedRef.current) return
 
-      const audioContext = audioContextRef.current
-      const sampleCount = Math.floor(audioContext.sampleRate * 0.6)
-      const toneLength = Math.floor(audioContext.sampleRate * 0.3)
-      const buffer = audioContext.createBuffer(1, sampleCount, audioContext.sampleRate)
-      const samples = buffer.getChannelData(0)
-      for (let index = 0; index < toneLength; index += 1) {
-        samples[index] = Math.sin((2 * Math.PI * 800 * index) / audioContext.sampleRate) * 0.3
-      }
-
-      const source = audioContext.createBufferSource()
-      source.buffer = buffer
-      source.loop = true
-      source.connect(audioContext.destination)
+      const source = createRandomSoundSource(audioContextRef.current, category)
       source.addEventListener('ended', () => {
         if (beepSourcesRef.current.get(key) === source) beepSourcesRef.current.delete(key)
       }, { once: true })
@@ -1082,6 +1248,51 @@ function App() {
     ? getFirstLeafPath(stages, timerState.currentStageIndex)
     : timerState.currentStageIndex
   const currentStage = stages ? getStageAtPath(stages, currentStagePath) : undefined
+  const currentSoundReference = currentStage?.runningSettings?.soundFile
+
+  useEffect(() => {
+    if (!currentSoundReference || currentStage?.runningSettings?.randomSound) {
+      setMissingCurrentSoundReference(null)
+      return
+    }
+    if (isMissingAudioReference(currentSoundReference)) {
+      setMissingCurrentSoundReference(currentSoundReference)
+      return
+    }
+
+    const audioId = getAudioReferenceId(currentSoundReference)
+    if (!audioId) {
+      setMissingCurrentSoundReference(null)
+      return
+    }
+
+    let isCurrentReference = true
+    setMissingCurrentSoundReference(null)
+    void getLocalAudioBlob(audioId).catch(() => {
+      if (isCurrentReference) setMissingCurrentSoundReference(currentSoundReference)
+    })
+    return () => {
+      isCurrentReference = false
+    }
+  }, [currentSoundReference, currentStage?.runningSettings?.randomSound])
+
+  const currentSoundLabel = currentStage?.runningSettings?.randomSound
+    ? `随机音效-${SOUND_CATEGORIES.find(({ value }) => value === (currentStage.runningSettings.soundCategory ?? 'wind'))?.label ?? '风声'}`
+    : currentSoundReference
+      ? missingCurrentSoundReference === currentSoundReference
+        ? `缺少音效文件：${getAudioDisplayName(currentSoundReference) || '未知文件'}`
+        : `音效：${getAudioDisplayName(currentSoundReference) || '已上传音效文件'}`
+      : '未设置音效'
+  const displayedSoundPlayers = (activeSoundPlayers.length > 0
+    ? [...activeSoundPlayers]
+    : [{ id: 'configured-stage-sound', label: currentSoundLabel }]
+  ).sort((left, right) => {
+    if (left.id === 'shared') return right.id === 'shared' ? 0 : -1
+    if (right.id === 'shared') return 1
+    const leftAlertId = Number(left.id.match(/^outside-alert-(\d+)$/)?.[1] ?? Number.MAX_SAFE_INTEGER)
+    const rightAlertId = Number(right.id.match(/^outside-alert-(\d+)$/)?.[1] ?? Number.MAX_SAFE_INTEGER)
+    return leftAlertId - rightAlertId
+  })
 
   useEffect(() => {
     if (!timerState.isRunning || currentStage) return
@@ -1134,58 +1345,66 @@ function App() {
                 {getStageDisplayName(stages || [], currentStagePath)}
               </h2>
             </div>
-            <div className="space-y-2">
-              <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
-              <p className="text-xs text-muted-foreground">剩余时间</p>
-              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-100 rounded-full"
-                  style={{
-                    width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
-                  }}
-                />
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
+                <p className="text-xs text-muted-foreground">剩余时间</p>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-100 rounded-full"
+                    style={{
+                      width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-2 text-xs">
+                {loop?.loopMode === 'fixed-count' && loop?.loopCount && (
+                  <Badge variant="secondary">
+                    第 {(loop?.currentIteration || 0) + 1} / {loop?.loopCount} 次
+                  </Badge>
+                )}
+                {loop?.loopMode === 'time-limited' && loop?.loopDuration && loop?.loopDurationUnit && (
+                  <Badge variant="secondary">
+                    {formatTime(loop?.totalElapsed || 0)} / {loop?.loopDuration} {loop?.loopDurationUnit}
+                  </Badge>
+                )}
+                {loop?.loopMode === 'infinite' && (
+                  <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
+                )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 justify-center items-center text-xs">
-              <Badge variant="outline">
-                阶段 {currentStagePath.map((index) => index + 1).join('.')}
-              </Badge>
-              {loop?.loopMode === 'fixed-count' && loop?.loopCount && (
-                <Badge variant="secondary">
-                  第 {(loop?.currentIteration || 0) + 1} / {loop?.loopCount} 次
-                </Badge>
-              )}
-              {loop?.loopMode === 'time-limited' && loop?.loopDuration && loop?.loopDurationUnit && (
-                <Badge variant="secondary">
-                  {formatTime(loop?.totalElapsed || 0)} / {loop?.loopDuration} {loop?.loopDurationUnit}
-                </Badge>
-              )}
-              {loop?.loopMode === 'infinite' && (
-                <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
-                {timerState.isPaused ? (
-                  <>
-                    <PlayCircle size={20} className="mr-2" weight="fill" />
-                    继续
-                  </>
-                ) : (
-                  <>
-                    <Pause size={20} className="mr-2" weight="fill" />
-                    暂停
-                  </>
-                )}
-              </Button>
-              <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
-                <SkipForward size={20} className="mr-2" weight="fill" />
-                跳过
-              </Button>
-              <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
-                <Stop size={20} className="mr-2" weight="fill" />
-                停止
-              </Button>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
+                  {timerState.isPaused ? (
+                    <>
+                      <PlayCircle size={20} className="mr-2" weight="fill" />
+                      继续
+                    </>
+                  ) : (
+                    <>
+                      <Pause size={20} className="mr-2" weight="fill" />
+                      暂停
+                    </>
+                  )}
+                </Button>
+                <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
+                  <SkipForward size={20} className="mr-2" weight="fill" />
+                  跳过
+                </Button>
+                <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
+                  <Stop size={20} className="mr-2" weight="fill" />
+                  停止
+                </Button>
+              </div>
+              <div className="flex flex-col items-center gap-2 text-xs">
+                {displayedSoundPlayers.map(({ id, label }) => (
+                  <Badge key={id} variant="outline" className="max-w-full" title={label}>
+                    <span className="truncate">{label}</span>
+                  </Badge>
+                ))}
+              </div>
             </div>
           </Card>
         )}

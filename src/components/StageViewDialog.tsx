@@ -1,9 +1,9 @@
-import { Stage } from '@/types'
+import { Stage, SOUND_CATEGORIES } from '@/types'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { SpeakerHigh, Image, Vibrate, Check, X } from '@phosphor-icons/react'
+import { SpeakerHigh, Image, Vibrate, X } from '@phosphor-icons/react'
 import { getAudioDisplayName } from '@/lib/audio-storage'
 
 interface StageViewDialogProps {
@@ -25,6 +25,9 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
     wallpaperMode: 'random' as const,
     enableVibration: true,
   }
+
+  const getSoundCategoryLabel = (category?: string): string =>
+    SOUND_CATEGORIES.find((soundCategory) => soundCategory.value === category)?.label ?? '风声'
 
   const getTimeUnitLabel = (unit: string): string => {
     const labels: Record<string, string> = {
@@ -124,7 +127,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">随机音效:</span>
                             {runningSettings.randomSound ? (
-                              <Check className="text-green-600" size={20} />
+                              <span>{getSoundCategoryLabel(runningSettings.soundCategory)}</span>
                             ) : (
                               <X className="text-muted-foreground" size={20} />
                             )}
@@ -196,7 +199,7 @@ export function StageViewDialog({ stage, children }: StageViewDialogProps) {
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground">随机音效:</span>
                             {endSettings.randomSound ? (
-                              <Check className="text-green-600" size={20} />
+                              <span>{getSoundCategoryLabel(endSettings.soundCategory)}</span>
                             ) : (
                               <X className="text-muted-foreground" size={20} />
                             )}

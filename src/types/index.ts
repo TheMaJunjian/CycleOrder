@@ -4,10 +4,23 @@ export type LoopMode = 'infinite' | 'fixed-count' | 'time-limited'
 
 export type AlertTiming = 'inside' | 'outside'
 
+export const SOUND_CATEGORIES = [
+  { value: 'wind', label: '风声' },
+  { value: 'thunder', label: '雷声' },
+  { value: 'rain', label: '雨声' },
+  { value: 'fire', label: '火焰声' },
+  { value: 'ocean', label: '海浪声' },
+  { value: 'stream', label: '溪流水声' },
+  { value: 'forest', label: '森林鸟鸣' },
+  { value: 'night', label: '夜间虫鸣' },
+] as const
+
+export type SoundCategory = typeof SOUND_CATEGORIES[number]['value']
+
 export interface StageSettings {
   soundFile?: string
   randomSound: boolean
-  soundCategory?: string
+  soundCategory?: SoundCategory
   wallpaper?: string
   wallpaperMode: 'fixed' | 'random'
   vibrationPattern?: number[]
