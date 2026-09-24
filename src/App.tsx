@@ -22,6 +22,17 @@ const StrategyManagementDialog = lazy(() =>
 )
 
 function App() {
+  useEffect(() => {
+    const audioSession = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    if (!audioSession) return
+
+    try {
+      audioSession.type = 'ambient'
+    } catch (error) {
+      console.warn('Failed to set ambient audio session', error)
+    }
+  }, [])
+
   const [stages, setStages] = useLocalStorage<Stage[]>('timer-stages', [])
   const [loop, setLoop] = useLocalStorage<Loop>('timer-loop', {
     id: generateId(),
