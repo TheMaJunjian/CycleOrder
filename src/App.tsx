@@ -243,6 +243,14 @@ function App() {
       : path
   }
 
+  const cloneStagesWithNewIds = (stageList: Stage[]): Stage[] => stageList.map((stage) => ({
+    ...stage,
+    id: generateId(),
+    embeddedStrategyStages: stage.embeddedStrategyStages
+      ? cloneStagesWithNewIds(stage.embeddedStrategyStages)
+      : stage.embeddedStrategyStages,
+  }))
+
   const getNextStagePath = (stageList: Stage[], path: number[]): number[] | undefined => {
     const currentStage = getStageAtPath(stageList, path)
     if (currentStage?.embeddedStrategyStages?.length) {
@@ -302,11 +310,21 @@ function App() {
         timerEffectCallbacksRef.current.setTimerState((prev) => {
           const now = Date.now()
           const elapsedSinceLastUpdate = Math.max(0, now - (prev.lastUpdatedAt || now))
-          let currentStageElapsed = prev.currentStageElapsed + elapsedSinceLastUpdate
+          let currentLoop = loop
+          const maxLoopDuration = currentLoop?.loopMode === 'time-limited'
+            ? convertToMilliseconds(currentLoop.loopDuration || 60, currentLoop.loopDurationUnit || 'minutes')
+            : null
+          const remainingLoopDuration = maxLoopDuration === null
+            ? null
+            : Math.max(0, maxLoopDuration - (currentLoop?.totalElapsed || 0) - prev.totalElapsed)
+          const elapsedForCurrentTick = remainingLoopDuration === null
+            ? elapsedSinceLastUpdate
+            : Math.min(elapsedSinceLastUpdate, remainingLoopDuration)
+          const reachedTimeLimit = remainingLoopDuration !== null && elapsedSinceLastUpdate >= remainingLoopDuration
+          let currentStageElapsed = prev.currentStageElapsed + elapsedForCurrentTick
           let currentStagePath = timerEffectCallbacksRef.current.getFirstLeafPath(stages, prev.currentStageIndex)
           let currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, currentStagePath)
           let elapsedBeforeCurrentStage = Math.max(0, prev.totalElapsed - prev.currentStageElapsed)
-          let currentLoop = loop
           let completedStage: Stage | undefined
           let nextStageAfterCompletion: Stage | undefined
           let transitionCount = 0
@@ -370,6 +388,28 @@ function App() {
             currentStagePath = timerEffectCallbacksRef.current.getInitialStagePath(stages)
             currentStage = timerEffectCallbacksRef.current.getStageAtPath(stages, currentStagePath)
             nextStageAfterCompletion = currentStage
+          }
+
+          if (reachedTimeLimit) {
+            if (currentLoop && maxLoopDuration !== null) {
+              timerEffectCallbacksRef.current.setLoop({
+                ...currentLoop,
+                totalElapsed: Math.min(
+                  maxLoopDuration,
+                  (currentLoop.totalElapsed || 0) + elapsedBeforeCurrentStage + currentStageElapsed
+                ),
+              })
+            }
+            timerEffectCallbacksRef.current.stopAllEffects()
+            toast.success('循环已完成')
+            return {
+              ...prev,
+              isRunning: false,
+              currentStageIndex: [0],
+              currentStageElapsed: 0,
+              totalElapsed: 0,
+              lastUpdatedAt: now,
+            }
           }
 
           if (loopChanged && currentLoop) {
@@ -987,11 +1027,19 @@ function App() {
       return
     }
     audioPausedRef.current = false
+    setLoop((currentLoop) => ({
+      ...currentLoop,
+      stages,
+      currentIteration: 0,
+      totalElapsed: 0,
+    }))
     setTimerState((prev) => ({
       ...prev,
       isRunning: true,
       isPaused: false,
       currentStageIndex: getInitialStagePath(stages),
+      currentStageElapsed: 0,
+      totalElapsed: 0,
       lastUpdatedAt: Date.now(),
     }))
   }
@@ -1093,6 +1141,12 @@ function App() {
 
   const deleteStage = (id: string) => {
     setStages((current) => (current || []).filter((s) => s.id !== id))
+    setSelectedStageIds((current) => {
+      if (!current.has(id)) return current
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
   }
 
   const updateStage = (id: string, updates: Partial<Stage>) => {
@@ -1118,6 +1172,13 @@ function App() {
   }
 
   const deleteEmbeddedStage = (embeddedStageId: string, childStageId: string) => {
+    const parentStage = stages.find((stage) => stage.id === embeddedStageId)
+    if (!parentStage?.embeddedStrategyStages) return
+    if (parentStage.embeddedStrategyStages.filter((stage) => stage.id !== childStageId).length === 0) {
+      toast.error('至少保留一个子阶段，可删除整个合并阶段')
+      return
+    }
+
     setStages((current) => (current || []).map((stage) => {
       if (stage.id !== embeddedStageId || !stage.embeddedStrategyStages) return stage
       const embeddedStrategyStages = stage.embeddedStrategyStages.filter((childStage) => childStage.id !== childStageId)
@@ -1204,6 +1265,11 @@ function App() {
     const sortedSelectedStages = selectedStages.sort((a, b) => {
       return stages.indexOf(a) - stages.indexOf(b)
     })
+    if (sortedSelectedStages.length === 0) {
+      setSelectedStageIds(new Set())
+      toast.error('所选阶段已不存在')
+      return
+    }
 
     let totalDurationMs = 0
     sortedSelectedStages.forEach((stage) => {
@@ -1234,7 +1300,7 @@ function App() {
     })
 
     setSelectedStageIds(new Set())
-    toast.success(`已合并 ${selectedStageIds.size} 个阶段`)
+    toast.success(`已合并 ${sortedSelectedStages.length} 个阶段`)
   }
 
   const clearSelection = () => {
@@ -1242,12 +1308,13 @@ function App() {
   }
 
   const handleLoadStrategy = (strategyStages: Stage[], mode: StrategyLoadMode, strategyId: string, strategyName: string) => {
+    const loadedStages = cloneStagesWithNewIds(strategyStages)
     if (mode === 'expand') {
-      setStages((current) => [...(current || []), ...strategyStages])
-      toast.success(`已展开 ${strategyStages.length} 个阶段`)
+      setStages((current) => [...(current || []), ...loadedStages])
+      toast.success(`已展开 ${loadedStages.length} 个阶段`)
     } else {
       let totalDurationMs = 0
-      strategyStages.forEach((stage) => {
+      loadedStages.forEach((stage) => {
         totalDurationMs += convertToMilliseconds(stage.duration, stage.unit)
       })
 
@@ -1257,15 +1324,15 @@ function App() {
         duration: totalDurationMs / TIME_UNITS.minutes,
         unit: 'minutes',
         runningSettings: {
-          ...strategyStages[0].runningSettings,
+          ...loadedStages[0].runningSettings,
         },
         endSettings: {
-          ...strategyStages[strategyStages.length - 1].endSettings,
+          ...loadedStages[loadedStages.length - 1].endSettings,
         },
         isMerged: true,
         isEmbeddedStrategy: true,
         embeddedStrategyId: strategyId,
-        embeddedStrategyStages: strategyStages,
+        embeddedStrategyStages: loadedStages,
       }
 
       setStages((current) => [...(current || []), embeddedStage])
@@ -1274,17 +1341,24 @@ function App() {
   }
 
   const handleRunStrategy = (strategy: Strategy) => {
+    const loadedStages = cloneStagesWithNewIds(strategy.stages)
     stopAllEffects()
     stopAlertSound()
     prevStageIndexRef.current = ''
-    setStages(() => strategy.stages)
-    setLoop(() => strategy.loop)
+    setSelectedStageIds(new Set())
+    setStages(() => loadedStages)
+    setLoop(() => ({
+      ...strategy.loop,
+      stages: loadedStages,
+      currentIteration: 0,
+      totalElapsed: 0,
+    }))
     setSettings(() => strategy.settings)
     setAppState(() => ({ currentStrategyName: strategy.name }))
     setTimerState({
       isRunning: true,
       isPaused: false,
-      currentStageIndex: getInitialStagePath(strategy.stages),
+      currentStageIndex: getInitialStagePath(loadedStages),
       currentStageElapsed: 0,
       totalElapsed: 0,
       currentLoopIteration: [0],
@@ -1365,100 +1439,111 @@ function App() {
     : undefined
 
   return (
-    <div className="min-h-screen overflow-y-auto bg-background p-4 pb-20 md:p-6 md:pb-24 lg:p-8 lg:pb-28">
-      <div className="mx-auto max-w-5xl space-y-5">
-        <div className="text-center space-y-1 pb-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-foreground">环序</h1>
-          <p className="text-sm text-muted-foreground">循环次序 (CycleOrder)</p>
-        </div>
+    <div className="app-shell min-h-screen overflow-y-auto px-4 py-5 pb-10 sm:px-6 sm:py-7 sm:pb-10 lg:px-8">
+      <div className="mx-auto max-w-4xl space-y-7 md:space-y-8">
+        <header className="flex items-center gap-3 border-b border-border/70 pb-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-primary text-primary-foreground shadow-sm">
+            <Repeat size={20} weight="bold" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold leading-tight text-foreground md:text-2xl">环序</h1>
+            <p className="mt-1 text-sm text-muted-foreground">循环次序 · CycleOrder</p>
+          </div>
+        </header>
 
         {timerState.isRunning && currentStage && (
           <Card
-            className="p-6 md:p-8 text-center space-y-5 border-2 bg-cover bg-center"
+            className="overflow-hidden rounded-[8px] border border-primary/20 bg-cover bg-center p-5 text-left shadow-sm md:p-7"
             style={runningWallpaper ? {
               backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.78)), url(${runningWallpaper})`,
             } : undefined}
           >
-            {appState?.currentStrategyName && (
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前策略</p>
-                <h3 className="text-lg font-semibold text-foreground">{appState?.currentStrategyName}</h3>
-              </div>
-            )}
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">当前阶段</p>
-              <h2
-                className="truncate text-2xl md:text-3xl font-bold text-foreground"
-                title={getStageDisplayName(stages || [], currentStagePath)}
-              >
-                {getStageDisplayName(stages || [], currentStagePath)}
-              </h2>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <div className="text-4xl md:text-5xl font-bold text-primary tabular-nums">{formatTime(remainingTime, true)}</div>
-                <p className="text-xs text-muted-foreground">剩余时间</p>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-100 rounded-full"
-                    style={{
-                      width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
-                    }}
-                  />
+            <div className="grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-0">
+              <div className="flex flex-col justify-center gap-5 md:pr-7">
+                {appState?.currentStrategyName && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">当前策略</p>
+                    <h3 className="text-lg font-semibold text-foreground">{appState.currentStrategyName}</h3>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">当前阶段</p>
+                  <h2
+                    className="truncate text-2xl font-bold text-foreground md:text-3xl"
+                    title={getStageDisplayName(stages || [], currentStagePath)}
+                  >
+                    {getStageDisplayName(stages || [], currentStagePath)}
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {loop?.loopMode === 'fixed-count' && loop?.loopCount && (
+                    <Badge variant="secondary">
+                      第 {(loop?.currentIteration || 0) + 1} / {loop?.loopCount} 次
+                    </Badge>
+                  )}
+                  {loop?.loopMode === 'time-limited' && loop?.loopDuration && loop?.loopDurationUnit && (
+                    <Badge variant="secondary">
+                      {formatTime((loop?.totalElapsed || 0) + timerState.totalElapsed)} / {loop?.loopDuration} {loop?.loopDurationUnit}
+                    </Badge>
+                  )}
+                  {loop?.loopMode === 'infinite' && (
+                    <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
+                  )}
                 </div>
               </div>
-              <div className="flex flex-col items-center gap-2 text-xs">
-                {loop?.loopMode === 'fixed-count' && loop?.loopCount && (
-                  <Badge variant="secondary">
-                    第 {(loop?.currentIteration || 0) + 1} / {loop?.loopCount} 次
-                  </Badge>
-                )}
-                {loop?.loopMode === 'time-limited' && loop?.loopDuration && loop?.loopDurationUnit && (
-                  <Badge variant="secondary">
-                    {formatTime(loop?.totalElapsed || 0)} / {loop?.loopDuration} {loop?.loopDurationUnit}
-                  </Badge>
-                )}
-                {loop?.loopMode === 'infinite' && (
-                  <Badge variant="secondary">第 {(loop?.currentIteration || 0) + 1} 次</Badge>
-                )}
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 justify-center">
-                <Button onClick={handlePause} size="lg" variant="secondary" className="flex-1 sm:flex-initial h-12">
-                  {timerState.isPaused ? (
-                    <>
-                      <PlayCircle size={20} className="mr-2" weight="fill" />
-                      继续
-                    </>
-                  ) : (
-                    <>
-                      <Pause size={20} className="mr-2" weight="fill" />
-                      暂停
-                    </>
-                  )}
-                </Button>
-                <Button onClick={handleSkip} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12">
-                  <SkipForward size={20} className="mr-2" weight="fill" />
-                  跳过
-                </Button>
-                <Button onClick={handleReset} size="lg" variant="outline" className="flex-1 sm:flex-initial h-12 text-destructive hover:text-destructive">
-                  <Stop size={20} className="mr-2" weight="fill" />
-                  停止
-                </Button>
-              </div>
-              <div className="flex flex-col items-center gap-2 text-xs">
-                {displayedSoundPlayers.map(({ id, label }) => (
-                  <Badge key={id} variant="outline" className="max-w-full" title={label}>
-                    <span className="truncate">{label}</span>
-                  </Badge>
-                ))}
+              <div className="space-y-5 border-t border-border/70 pt-5 md:border-l md:border-t-0 md:pl-7 md:pt-0">
+                <div className="space-y-3">
+                  <div className="text-4xl font-bold leading-none text-primary tabular-nums md:text-5xl">
+                    {formatTime(remainingTime, true)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">剩余时间</p>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-100"
+                      style={{
+                        width: `${(timerState.currentStageElapsed / convertToMilliseconds(currentStage.duration, currentStage.unit)) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={handlePause} size="lg" variant="secondary" className="h-11 flex-1 sm:flex-initial">
+                      {timerState.isPaused ? (
+                        <>
+                          <PlayCircle size={20} className="mr-2" weight="fill" />
+                          继续
+                        </>
+                      ) : (
+                        <>
+                          <Pause size={20} className="mr-2" weight="fill" />
+                          暂停
+                        </>
+                      )}
+                    </Button>
+                    <Button onClick={handleSkip} size="lg" variant="outline" className="h-11 flex-1 sm:flex-initial">
+                      <SkipForward size={20} className="mr-2" weight="fill" />
+                      跳过
+                    </Button>
+                    <Button onClick={handleReset} size="lg" variant="outline" className="h-11 flex-1 text-destructive hover:text-destructive sm:flex-initial">
+                      <Stop size={20} className="mr-2" weight="fill" />
+                      停止
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {displayedSoundPlayers.map(({ id, label }) => (
+                      <Badge key={id} variant="outline" className="max-w-full" title={label}>
+                        <span className="truncate">{label}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </Card>
         )}
 
-        <Card className="p-4 md:p-5 space-y-4">
+        <Card className="gap-4 rounded-[8px] border-border/80 bg-card/95 p-4 shadow-sm md:gap-5 md:p-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h3 className="text-lg font-semibold">阶段列表</h3>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -1513,7 +1598,7 @@ function App() {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {(stages || []).map((stage, index) => {
               const isMerged = stage.isMerged === true
               const isEmbedded = stage.isEmbeddedStrategy === true
@@ -1538,19 +1623,21 @@ function App() {
                 <div 
                   key={stage.id} 
                   onClick={() => toggleStageSelection(stage.id)}
-                  className={`p-3 rounded-lg space-y-2.5 transition-all cursor-pointer ${
+                  className={`cursor-pointer space-y-3 rounded-[8px] border p-4 transition-colors ${
                     isSelected
-                      ? 'bg-primary/10 border border-primary shadow-sm' 
-                      : 'bg-muted/40 border border-transparent hover:bg-muted/60'
+                      ? 'border-primary/40 bg-primary/5 shadow-sm'
+                      : 'border-border/70 bg-background/70 hover:border-primary/20 hover:bg-muted/35'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground w-7 text-right shrink-0">{index + 1}.</span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] bg-muted text-xs font-semibold tabular-nums text-muted-foreground">
+                      {index + 1}
+                    </span>
                     <Input
                       value={stage.name}
                       onChange={(e) => updateStage(stage.id, { name: e.target.value })}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 min-w-0 h-9"
+                      className="h-10 min-w-0 flex-1"
                       placeholder="Stage name"
                     />
                     {!isMerged && (
@@ -1582,7 +1669,7 @@ function App() {
                   </div>
                   
                   {isMerged && (
-                    <div className="pl-7 space-y-2">
+                    <div className="space-y-3 pl-10">
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <Badge variant="secondary" className="text-xs">
                           {isEmbedded ? '嵌入策略' : '合并阶段'}
@@ -1595,9 +1682,9 @@ function App() {
                             <span className="text-muted-foreground">
                               · {stage.embeddedStrategyStages.length} 个子阶段
                             </span>
-                            <div className="space-y-2 rounded-md border border-border/60 bg-background/50 p-2">
+                            <div className="space-y-3 rounded-[8px] border border-border/60 bg-background/50 p-3">
                               {stage.embeddedStrategyStages.map((childStage, childIndex) => (
-                                <div key={childStage.id} className="space-y-2 rounded border bg-muted/30 p-2">
+                                <div key={childStage.id} className="space-y-2 rounded-[6px] border bg-muted/30 p-3">
                                   <div className="flex items-center gap-2">
                                   <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">
                                     {childIndex + 1}.
@@ -1696,7 +1783,7 @@ function App() {
                   )}
                   
                   {!isMerged && (
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pl-7">
+                    <div className="flex flex-col gap-2 pl-10 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-2 flex-1">
                         <NumericInput
                           value={stage.duration}

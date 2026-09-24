@@ -33,9 +33,30 @@ const migrateStageSoundIntensity = (stages: Stage[]): Stage[] => stages.map((sta
 
 const migrateStrategySoundIntensity = (strategy: Strategy): Strategy => ({
   ...strategy,
+  settings: {
+    showFullscreenAlert: typeof strategy.settings?.showFullscreenAlert === 'boolean'
+      ? strategy.settings.showFullscreenAlert
+      : true,
+    forceAcknowledge: typeof strategy.settings?.forceAcknowledge === 'boolean'
+      ? strategy.settings.forceAcknowledge
+      : false,
+    wallpaperMode: strategy.settings?.wallpaperMode === 'fixed' ? 'fixed' : 'random',
+    selectedWallpaper: typeof strategy.settings?.selectedWallpaper === 'string'
+      ? strategy.settings.selectedWallpaper
+      : undefined,
+    enableVibration: typeof strategy.settings?.enableVibration === 'boolean'
+      ? strategy.settings.enableVibration
+      : true,
+    muteAudio: typeof strategy.settings?.muteAudio === 'boolean'
+      ? strategy.settings.muteAudio
+      : false,
+  },
   stages: migrateStageSoundIntensity(strategy.stages),
   loop: {
     ...strategy.loop,
+    loopDurationUnit: strategy.loop.loopDurationUnit && validTimeUnits.has(strategy.loop.loopDurationUnit)
+      ? strategy.loop.loopDurationUnit
+      : undefined,
     stages: migrateStageSoundIntensity(strategy.loop.stages || strategy.stages),
   },
 })
@@ -95,6 +116,7 @@ const mapStrategyStages = (
       && !!loop
       && typeof loop === 'object'
       && (loop.loopMode === 'infinite' || loop.loopMode === 'fixed-count' || loop.loopMode === 'time-limited')
+      && (loop.loopMode !== 'time-limited' || !loop.loopDurationUnit || validTimeUnits.has(loop.loopDurationUnit))
       && (!loop.loopCount || (Number.isFinite(loop.loopCount) && loop.loopCount > 0))
       && (!loop.loopDuration || (Number.isFinite(loop.loopDuration) && loop.loopDuration > 0))
   }
@@ -522,7 +544,7 @@ export function StrategyManagementDialog({
                             <div className="bg-muted/20 p-3 rounded border-2 border-dashed border-border space-y-2">
                               {strategy.loadMode === 'expand' ? (
                                 <div className="space-y-1">
-                                  <div className="text-xs text-accent font-medium mb-2">展开模式 - 将显示所有子阶段</div>
+                                  <div className="mb-2 text-xs font-medium text-amber-800">展开模式 - 将显示所有子阶段</div>
                                   {strategy.stages.map((stage, idx) => (
                                     <div key={idx} className="flex items-center gap-2 bg-background/50 p-2 rounded text-xs">
                                       <span className="font-medium text-muted-foreground w-6">{idx + 1}</span>
@@ -544,7 +566,7 @@ export function StrategyManagementDialog({
                                     </Badge>
                                   </div>
                                   <details className="text-xs mt-2">
-                                    <summary className="cursor-pointer text-accent hover:text-accent/80 pl-2">包含 {strategy.stages.length} 个子阶段</summary>
+                                    <summary className="cursor-pointer pl-2 text-amber-800 hover:text-amber-900">包含 {strategy.stages.length} 个子阶段</summary>
                                     <div className="mt-2 space-y-1 pl-4 border-l-2 border-accent/30">
                                       {strategy.stages.map((stage, idx) => (
                                         <div key={idx} className="text-muted-foreground">

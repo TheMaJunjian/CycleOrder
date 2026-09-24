@@ -8,30 +8,30 @@
 }
 
 :root {
-  --background: oklch(0.99 0.002 160);
-  --foreground: oklch(0.20 0.01 220);
+  --background: oklch(0.985 0.008 155);
+  --foreground: oklch(0.22 0.018 164);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.20 0.01 220);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.20 0.01 220);
+  --card: oklch(0.999 0.003 155);
+  --card-foreground: oklch(0.22 0.018 164);
+  --popover: oklch(0.999 0.003 155);
+  --popover-foreground: oklch(0.22 0.018 164);
 
-  --primary: oklch(0.50 0.20 250);
-  --primary-foreground: oklch(0.99 0.002 160);
-  --secondary: oklch(0.94 0.01 220);
-  --secondary-foreground: oklch(0.20 0.01 220);
-  --muted: oklch(0.96 0.005 220);
-  --muted-foreground: oklch(0.48 0.01 220);
-  --accent: oklch(0.60 0.18 280);
-  --accent-foreground: oklch(0.99 0.002 160);
-  --destructive: oklch(0.58 0.22 25);
-  --destructive-foreground: oklch(0.99 0.002 160);
+  --primary: oklch(0.48 0.13 155);
+  --primary-foreground: oklch(0.99 0.005 155);
+  --secondary: oklch(0.94 0.024 155);
+  --secondary-foreground: oklch(0.24 0.035 160);
+  --muted: oklch(0.955 0.008 160);
+  --muted-foreground: oklch(0.48 0.018 163);
+  --accent: oklch(0.94 0.035 82);
+  --accent-foreground: oklch(0.24 0.025 165);
+  --destructive: oklch(0.56 0.20 28);
+  --destructive-foreground: oklch(0.99 0.005 155);
 
-  --border: oklch(0.90 0.01 220);
-  --input: oklch(0.90 0.01 220);
-  --ring: oklch(0.50 0.20 250);
+  --border: oklch(0.89 0.012 160);
+  --input: oklch(0.89 0.012 160);
+  --ring: oklch(0.48 0.13 155);
 
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 }
 
 @theme {
@@ -64,7 +64,11 @@
 }
 
 body {
-  font-family: 'Noto Sans SC', sans-serif;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.app-shell {
+  background-image: linear-gradient(180deg, oklch(0.95 0.02 154) 0%, var(--background) 26rem);
 }
