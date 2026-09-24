@@ -708,12 +708,6 @@ function App() {
         samples[index] = whiteNoise * 0.025 + Math.sin(2 * Math.PI * 4100 * time) * chirpEnvelope * 0.08
       }
 
-      if (!loop) {
-        const fadeSamples = Math.floor(sampleRate * 0.18)
-        const fadeIn = Math.min(1, index / fadeSamples)
-        const fadeOut = Math.min(1, (samples.length - index) / fadeSamples)
-        samples[index] *= Math.min(fadeIn, fadeOut)
-      }
     }
 
     const filter = audioContext.createBiquadFilter()
