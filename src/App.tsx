@@ -289,7 +289,7 @@ function App() {
       prevStageIndexRef.current = stagePathKey
 
       const runningSoundKey = currentStage
-        ? `${currentStage.id}:${currentStage.runningSettings?.randomSound}:${currentStage.runningSettings?.soundFile}:${currentStage.runningSettings?.soundCategory}:${currentStage.runningSettings?.soundIntensity}`
+        ? `${currentStage.id}:${currentStage.duration}:${currentStage.unit}:${currentStage.runningSettings?.randomSound}:${currentStage.runningSettings?.soundFile}:${currentStage.runningSettings?.soundCategory}:${currentStage.runningSettings?.soundIntensity}`
         : ''
       const soundSettingsChanged = prevStageSoundKeyRef.current !== runningSoundKey
       prevStageSoundKeyRef.current = runningSoundKey
